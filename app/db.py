@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS reviews (
     interval_days INTEGER DEFAULT 0,
     repetitions INTEGER DEFAULT 0,
     due_date TEXT,
-    lapses INTEGER DEFAULT 0
+    lapses INTEGER DEFAULT 0,
+    total_reviews INTEGER DEFAULT 0  -- monotonic count of every grade ever given, pass or fail
 );
 
 CREATE TABLE IF NOT EXISTS breakdown_cache (
@@ -44,11 +45,15 @@ CREATE TABLE IF NOT EXISTS api_log (
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """Add columns introduced after initial release to any pre-existing db."""
-    existing = {row["name"] for row in conn.execute("PRAGMA table_info(cards)")}
-    if "headword" not in existing:
+    existing_cards = {row["name"] for row in conn.execute("PRAGMA table_info(cards)")}
+    if "headword" not in existing_cards:
         conn.execute("ALTER TABLE cards ADD COLUMN headword TEXT DEFAULT ''")
-    if "audio_path" not in existing:
+    if "audio_path" not in existing_cards:
         conn.execute("ALTER TABLE cards ADD COLUMN audio_path TEXT")
+
+    existing_reviews = {row["name"] for row in conn.execute("PRAGMA table_info(reviews)")}
+    if "total_reviews" not in existing_reviews:
+        conn.execute("ALTER TABLE reviews ADD COLUMN total_reviews INTEGER DEFAULT 0")
 
 
 def init_db() -> None:

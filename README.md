@@ -103,6 +103,17 @@ and call counts from the `api_log` table.
   through romaji-to-kana-and-back, so real English words ("good", "counting
   people") aren't mangled into nonsense kana and appended as noise
   ([app/romaji.py](app/romaji.py)).
+- **Two clocks for repetition, not one.** SM-2's `due_date` (days) still
+  governs when a card comes back on a *future day*. Layered on top,
+  grading also re-inserts the card into the *current session's* queue at a
+  distance that compounds with SM-2's own `repetitions` count (which resets
+  to 0 the moment a card is graded Hard or Very Hard) — so a card
+  consistently graded Very Easy gets pushed farther out each time, fast
+  enough to fall out of a normal-sized session entirely, while a
+  struggling card always snaps back to a short, flat distance regardless
+  of history. Session-local only (an in-memory JS array, not persisted) —
+  restarting the page resets it, same as Anki's learning queue
+  ([frontend/app.js](frontend/app.js)).
 
 ---
 

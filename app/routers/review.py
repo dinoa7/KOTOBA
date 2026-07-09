@@ -15,7 +15,7 @@ def due_cards():
     with get_conn() as conn:
         rows = conn.execute(
             """
-            SELECT c.* FROM cards c
+            SELECT c.*, r.total_reviews AS review_count FROM cards c
             JOIN reviews r ON r.card_id = c.id
             WHERE r.due_date <= ?
             ORDER BY r.due_date
@@ -41,11 +41,12 @@ def grade_card(payload: ReviewGrade):
             lapses=row["lapses"],
         )
         new_state, due_date = grade(state, payload.quality)
+        total_reviews = row["total_reviews"] + 1
 
         conn.execute(
             """
             UPDATE reviews SET easiness = ?, interval_days = ?, repetitions = ?,
-                due_date = ?, lapses = ? WHERE card_id = ?
+                due_date = ?, lapses = ?, total_reviews = ? WHERE card_id = ?
             """,
             (
                 new_state.easiness,
@@ -53,6 +54,7 @@ def grade_card(payload: ReviewGrade):
                 new_state.repetitions,
                 due_date.isoformat(),
                 new_state.lapses,
+                total_reviews,
                 payload.card_id,
             ),
         )
@@ -64,4 +66,5 @@ def grade_card(payload: ReviewGrade):
         "repetitions": new_state.repetitions,
         "due_date": due_date.isoformat(),
         "lapses": new_state.lapses,
+        "review_count": total_reviews,
     }

@@ -85,6 +85,31 @@ function renderBreakdownTable(breakdown) {
 let dueQueue = [];
 let currentCard = null;
 
+// How many other cards get shown before a just-graded card resurfaces this
+// session. This is separate from — and in addition to — the long-term SM-2
+// due_date the same grade also sets on the backend for future days.
+//
+// Not a flat per-grade lookup: distance compounds with `repetitions` (SM-2's
+// count of consecutive good grades, returned by /review/grade — it resets to
+// 0 the moment a card is graded Hard or Very Hard). Each grade tier has its
+// own base distance and its own growth rate per repetition, so a card
+// consistently graded Very Easy gets pushed out of the session fast, a
+// Medium card grows more slowly, and a Hard/Very Hard grade always snaps
+// back to a short distance regardless of prior history (repetitions is 0
+// again the instant it resets).
+const GRADE_TIERS = {
+  0: { base: 2, growth: 1.0 }, // Very Hard — never compounds, always ~immediate
+  2: { base: 3, growth: 1.15 }, // Hard
+  3: { base: 5, growth: 1.3 }, // Medium
+  4: { base: 8, growth: 1.6 }, // Easy
+  5: { base: 12, growth: 2.0 }, // Very Easy — compounds fastest
+};
+
+function computeRequeueDistance(quality, repetitions) {
+  const tier = GRADE_TIERS[quality] ?? GRADE_TIERS[3];
+  return Math.round(tier.base * Math.pow(tier.growth, repetitions));
+}
+
 async function loadDue() {
   dueQueue = await apiFetch(`${API}/review/due`);
   nextCard();
@@ -111,6 +136,9 @@ function nextCard() {
   document.getElementById("rv-audio").innerHTML = renderAudio(currentCard.audio_path);
   document.getElementById("rv-reading").textContent = currentCard.reading || "";
   document.getElementById("rv-english").textContent = currentCard.english;
+  const count = currentCard.review_count || 0;
+  document.getElementById("rv-review-count").textContent =
+    count === 0 ? "New card" : `Reviewed ${count} time${count === 1 ? "" : "s"}`;
 }
 
 document.getElementById("rv-show").addEventListener("click", () => {
@@ -136,11 +164,19 @@ document.getElementById("rv-breakdown-btn").addEventListener("click", async () =
 
 document.querySelectorAll(".grade-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
-    await apiFetch(`${API}/review/grade`, {
+    const quality = parseInt(btn.dataset.q, 10);
+    const gradedCard = currentCard;
+    const result = await apiFetch(`${API}/review/grade`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ card_id: currentCard.id, quality: parseInt(btn.dataset.q, 10) }),
+      body: JSON.stringify({ card_id: gradedCard.id, quality }),
     });
+
+    gradedCard.review_count = result.review_count;
+    const distance = computeRequeueDistance(quality, result.repetitions);
+    const insertAt = Math.min(dueQueue.length, distance);
+    dueQueue.splice(insertAt, 0, gradedCard);
+
     nextCard();
   });
 });

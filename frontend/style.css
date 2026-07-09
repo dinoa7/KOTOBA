@@ -86,11 +86,21 @@ button:hover { opacity: 0.9; }
   background: var(--panel);
   border: 1px solid var(--border);
   color: var(--text);
-  margin: 0 0.2rem;
-  min-width: 2.2rem;
+  margin: 0.3rem 0.2rem 0;
+  min-width: 5.2rem;
+  font-size: 0.85rem;
 }
-.grade-btn[data-q="0"], .grade-btn[data-q="1"], .grade-btn[data-q="2"] { border-color: var(--accent); }
-.grade-btn[data-q="3"], .grade-btn[data-q="4"], .grade-btn[data-q="5"] { border-color: #4fbf6e; }
+.grade-btn[data-q="0"] { border-color: var(--accent); }
+.grade-btn[data-q="2"] { border-color: #d98a4f; }
+.grade-btn[data-q="3"] { border-color: #d9c24f; }
+.grade-btn[data-q="4"] { border-color: #8fbf4f; }
+.grade-btn[data-q="5"] { border-color: #4fbf6e; }
+
+.review-count {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.6rem;
+}
 
 .breakdown-btn {
   background: var(--panel);

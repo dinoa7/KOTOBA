@@ -13,9 +13,11 @@ class CardIn(BaseModel):
 class CardOut(CardIn):
     id: int
     created_at: str
+    review_count: int = 0
 
     @classmethod
     def from_row(cls, row) -> "CardOut":
+        row_keys = row.keys()
         return cls(
             id=row["id"],
             japanese=row["japanese"],
@@ -25,6 +27,7 @@ class CardOut(CardIn):
             headword=row["headword"] or "",
             audio_path=row["audio_path"],
             created_at=row["created_at"],
+            review_count=row["review_count"] if "review_count" in row_keys else 0,
         )
 
 
