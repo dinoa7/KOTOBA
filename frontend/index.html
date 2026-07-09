@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOTOBA — 言葉</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>KOTOBA <span class="jp">言葉</span></h1>
+  <nav>
+    <button data-tab="review" class="tab-btn active">Review</button>
+    <button data-tab="search" class="tab-btn">Search</button>
+    <button data-tab="drill" class="tab-btn">Drill</button>
+    <button data-tab="confusions" class="tab-btn">Confusions</button>
+    <button data-tab="import" class="tab-btn">Import</button>
+  </nav>
+  <div id="offline-badge" class="badge hidden">AI offline</div>
+</header>
+
+<main>
+  <!-- REVIEW -->
+  <section id="tab-review" class="tab-panel active">
+    <div id="review-empty" class="hidden">No cards due. Nice work.</div>
+    <div id="review-card" class="card hidden">
+      <div class="jp-text" id="rv-japanese"></div>
+      <div id="rv-audio"></div>
+      <div id="rv-reveal" class="hidden">
+        <div class="reading" id="rv-reading"></div>
+        <div class="english" id="rv-english"></div>
+        <button id="rv-breakdown-btn">Break this down</button>
+        <div id="rv-breakdown-table"></div>
+      </div>
+      <div class="controls">
+        <button id="rv-show">Show Answer</button>
+        <div id="rv-grades" class="hidden">
+          <span>Grade:</span>
+          <button class="grade-btn" data-q="0">0</button>
+          <button class="grade-btn" data-q="1">1</button>
+          <button class="grade-btn" data-q="2">2</button>
+          <button class="grade-btn" data-q="3">3</button>
+          <button class="grade-btn" data-q="4">4</button>
+          <button class="grade-btn" data-q="5">5</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEARCH -->
+  <section id="tab-search" class="tab-panel">
+    <input id="search-input" type="text" placeholder="て form requests, counting people, sounds like かえる...">
+    <button id="search-btn">Search</button>
+    <div id="search-results"></div>
+  </section>
+
+  <!-- DRILL -->
+  <section id="tab-drill" class="tab-panel">
+    <input id="drill-grammar" type="text" placeholder="grammar point, e.g. te-form request" value="て-form request">
+    <button id="drill-btn">Generate Drill</button>
+    <div id="drill-results"></div>
+  </section>
+
+  <!-- CONFUSIONS -->
+  <section id="tab-confusions" class="tab-panel">
+    <button id="confusions-btn">Find Confusions</button>
+    <div id="confusions-results"></div>
+  </section>
+
+  <!-- IMPORT -->
+  <section id="tab-import" class="tab-panel">
+    <p>CSV columns: <code>japanese,reading,english,tags</code> (or Anki .txt export)</p>
+    <input id="import-file" type="file" accept=".csv,.txt">
+    <button id="import-btn">Import</button>
+    <div id="import-result"></div>
+    <hr>
+    <h3>Add a single card</h3>
+    <input id="add-japanese" placeholder="japanese">
+    <input id="add-reading" placeholder="reading (optional)">
+    <input id="add-english" placeholder="english">
+    <input id="add-tags" placeholder="tags (comma-separated)">
+    <button id="add-btn">Add Card</button>
+  </section>
+</main>
+
+<footer>
+  <span id="stats-line"></span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+data/kotoba.db
+data/vectors.npz
+data/audio/*
+*.egg-info/
+.pytest_cache/
+.DS_Store
+
+# raw Anki decks are large binary media bundles (often >100MB, over GitHub's
+# per-file limit) — imported directly by the app, never committed
+cards/*.apkg
