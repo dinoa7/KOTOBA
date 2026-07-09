@@ -142,3 +142,6 @@ breakdowns/day, ~3 drills/day, ~2 searches/day) lands around 366 calls/month.
   of history. Session-local only (an in-memory JS array, not persisted) —
   restarting the page resets it, same as Anki's learning queue
   ([frontend/app.js](frontend/app.js)).
+
+## Video demo
+https://youtu.be/C85SlkMwqmY
