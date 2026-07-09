@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+data/kotoba.db
+data/vectors.npz
+data/audio/*
+*.egg-info/
+.pytest_cache/
+.DS_Store
+
+# raw Anki decks are large binary media bundles (often >100MB, over GitHub's
+# per-file limit) — imported directly by the app, never committed
+cards/*.apkg
+
+# raw Claude Design exports embed every asset as base64 (fonts, images) —
+# 10MB+ per file. The actual design was extracted into frontend/ already.
+*.dc.html
+KOTOBA Hanko.html
+KOTOBA Current.html
+KOTOBA Redesign Options.html
