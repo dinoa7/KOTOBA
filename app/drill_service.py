@@ -20,6 +20,10 @@ _SYSTEM_PROMPT = (
 )
 
 
+class NoKnownVocabularyError(Exception):
+    """Raised when there's no vocabulary yet to constrain generation to."""
+
+
 def known_vocabulary() -> list[str]:
     """Words, not sentences: `japanese` is a full example sentence, so the
     constrained-generation prompt needs the standalone `headword` instead
@@ -60,6 +64,12 @@ def _validate(raw: str) -> DrillResponse:
 
 def generate_drill(grammar_point: str, count: int) -> DrillResponse:
     vocab = known_vocabulary()
+    if not vocab:
+        raise NoKnownVocabularyError(
+            "No known vocabulary yet — drills are constrained to words from cards "
+            "you've reviewed at least twice (repetitions >= 2 in SM-2 terms). "
+            "Review some cards first, then try again."
+        )
     prompt = _build_prompt(grammar_point, count, vocab)
     raw = cohere_client.chat(_SYSTEM_PROMPT, prompt)
     try:

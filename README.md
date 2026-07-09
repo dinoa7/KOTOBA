@@ -97,6 +97,12 @@ and call counts from the `api_log` table.
   constraining drill generation to vocabulary you actually know, so it's
   kept in a separate `headword` column and only used there
   ([app/drill_service.py](app/drill_service.py)).
+- **Romaji-aware search, without corrupting English queries.** Search
+  understands typed romaji ("te" finds て) by appending a kana conversion to
+  the query before embedding — but only for words that round-trip cleanly
+  through romaji-to-kana-and-back, so real English words ("good", "counting
+  people") aren't mangled into nonsense kana and appended as noise
+  ([app/romaji.py](app/romaji.py)).
 
 ---
 

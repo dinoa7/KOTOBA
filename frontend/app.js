@@ -36,6 +36,36 @@ function renderAudio(audioPath) {
   return `<audio controls src="/audio/${encodeURIComponent(audioPath)}" style="display:block;margin:0.6rem auto;"></audio>`;
 }
 
+function escapeAttr(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+let breakdownSlotCounter = 0;
+
+function renderBreakdownButton(japanese) {
+  const slotId = `bd-slot-${breakdownSlotCounter++}`;
+  return `<button class="breakdown-btn" data-japanese="${escapeAttr(japanese)}" data-target="${slotId}">Break this down</button>
+    <div id="${slotId}" class="breakdown-slot"></div>`;
+}
+
+document.addEventListener("click", async (e) => {
+  if (!e.target.classList.contains("breakdown-btn")) return;
+  const btn = e.target;
+  const japanese = btn.dataset.japanese;
+  const slot = document.getElementById(btn.dataset.target);
+  slot.textContent = "Loading...";
+  try {
+    const data = await apiFetch(`${API}/breakdown`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ japanese }),
+    });
+    slot.innerHTML = renderBreakdownTable(data.breakdown);
+  } catch (err) {
+    slot.textContent = "AI unavailable — breakdown offline.";
+  }
+});
+
 function renderBreakdownTable(breakdown) {
   const rows = breakdown
     .map(
@@ -130,6 +160,7 @@ document.getElementById("search-btn").addEventListener("click", async () => {
           <div class="jp-text" style="font-size:1.2rem">${r.card.japanese}</div>
           ${renderAudio(r.card.audio_path)}
           <div class="english">${r.card.english}</div>
+          ${renderBreakdownButton(r.card.japanese)}
         </div>`
       )
       .join("") || "<p>No results.</p>";
@@ -160,9 +191,9 @@ document.getElementById("drill-btn").addEventListener("click", async () => {
           </details>
         </div>`
       )
-      .join("");
+      .join("") || "<p>No drill sentences generated — try a different grammar point.</p>";
   } catch (err) {
-    resultsEl.textContent = "AI unavailable — drill generation requires the Cohere API.";
+    resultsEl.textContent = err.message || "AI unavailable — drill generation requires the Cohere API.";
   }
 });
 
@@ -176,7 +207,9 @@ document.getElementById("confusions-btn").addEventListener("click", async () => 
       (p) => `<div class="result-item">
         <span class="score">sim ${p.similarity.toFixed(3)} · ${p.combined_lapses} lapses</span>
         <div>${p.card_a.japanese} <span class="english">(${p.card_a.english})</span></div>
+        ${renderBreakdownButton(p.card_a.japanese)}
         <div>${p.card_b.japanese} <span class="english">(${p.card_b.english})</span></div>
+        ${renderBreakdownButton(p.card_b.japanese)}
       </div>`
     )
     .join("") || "<p>No confusions detected yet.</p>";

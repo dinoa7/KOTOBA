@@ -7,6 +7,8 @@ import random
 import time
 
 import cohere
+import httpx
+from cohere import errors as cohere_errors
 
 from app.config import CHAT_MODEL, COHERE_API_KEY, EMBED_MODEL, MOCK, RERANK_MODEL
 from app.db import get_conn
@@ -14,6 +16,19 @@ from app.db import get_conn
 REQUEST_TIMEOUT = 30
 MAX_RETRIES = 4
 BASE_BACKOFF = 1.0
+
+# Transient failures worth retrying: rate limits, Cohere-side outages, and
+# raw network blips. Anything else (bad request, auth, not found, ...) is a
+# real error retrying won't fix, so it's left to propagate immediately.
+RETRYABLE_ERRORS = (
+    cohere_errors.TooManyRequestsError,
+    cohere_errors.InternalServerError,
+    cohere_errors.ServiceUnavailableError,
+    cohere_errors.GatewayTimeoutError,
+    cohere_errors.ClientClosedRequestError,
+    httpx.TransportError,
+    httpx.TimeoutException,
+)
 
 _client: cohere.ClientV2 | None = None
 
@@ -42,7 +57,7 @@ def _with_retry(fn, endpoint: str, model: str, input_chars: int):
             latency_ms = int((time.monotonic() - start) * 1000)
             _log(endpoint, model, input_chars, latency_ms)
             return result
-        except cohere.errors.TooManyRequestsError as e:
+        except RETRYABLE_ERRORS as e:
             last_err = e
             sleep_s = BASE_BACKOFF * (2**attempt) + random.uniform(0, 0.5)
             time.sleep(sleep_s)

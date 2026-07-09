@@ -1,5 +1,11 @@
+import pytest
+from fastapi.testclient import TestClient
+
 from app.db import get_conn
-from app.drill_service import known_vocabulary
+from app.drill_service import NoKnownVocabularyError, generate_drill, known_vocabulary
+from app.main import app
+
+client = TestClient(app)
 
 
 def _insert_card(japanese, english, headword, repetitions):
@@ -37,3 +43,19 @@ def test_known_vocabulary_excludes_cards_below_repetition_threshold():
     vocab = known_vocabulary()
 
     assert vocab == []
+
+
+def test_generate_drill_raises_clear_error_instead_of_calling_api_with_no_vocab():
+    # Fresh import, nothing reviewed yet -> known_vocabulary() is empty.
+    # Command A can't write a sentence with zero permitted words anyway
+    # (it just returns an empty array after a real ~15s call) — fail fast
+    # instead, before spending an API call on a guaranteed-empty response.
+    with pytest.raises(NoKnownVocabularyError):
+        generate_drill("te-form", 3)
+
+
+def test_drill_endpoint_returns_400_with_clear_message_when_no_known_vocab():
+    resp = client.post("/drill", json={"grammar_point": "te-form", "count": 3})
+
+    assert resp.status_code == 400
+    assert "reviewed" in resp.json()["detail"]

@@ -111,47 +111,71 @@ def _parse_apkg_rows(raw_bytes: bytes, deck_tag: str) -> list[dict]:
     ]
 
 
-async def _do_import(new_rows: list[dict], skipped: int) -> ImportResult:
-    if not new_rows:
-        return ImportResult(imported=0, skipped_duplicates=skipped, embed_calls=0)
-
+def _insert_batch(rows: list[dict]) -> list[int]:
     with get_conn() as conn:
-        new_ids = []
-        for r in new_rows:
+        ids = []
+        for r in rows:
             cur = conn.execute(
                 "INSERT INTO cards (japanese, reading, english, tags, headword, audio_path) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
                 (r["japanese"], r["reading"], r["english"], r["tags"], r["headword"], r["audio_path"]),
             )
-            new_ids.append(cur.lastrowid)
+            ids.append(cur.lastrowid)
             conn.execute(
                 "INSERT INTO reviews (card_id, due_date) VALUES (?, ?)",
                 (cur.lastrowid, date.today().isoformat()),
             )
+    return ids
 
-    embed_texts = [f"{r['japanese']} ||| {r['english']}" for r in new_rows]
+
+async def _do_import(new_rows: list[dict], skipped: int) -> ImportResult:
+    if not new_rows:
+        return ImportResult(imported=0, skipped_duplicates=skipped, embed_calls=0)
+
+    # Embed each batch BEFORE inserting its cards, and save the vector store
+    # after every batch (not just at the end). If Cohere fails partway
+    # through a large import, everything up to that point is already fully
+    # embedded and persisted, and the rows that never got embedded were
+    # never inserted either — so simply re-running the import later picks
+    # up exactly where it left off, instead of those cards being stuck in
+    # the DB forever with no vector (and un-retryable, since a re-import
+    # would just skip them as duplicates).
     store = get_store()
+    imported = 0
     embed_calls = 0
     batches_this_window = 0
     window_start = time.monotonic()
-    for start in range(0, len(embed_texts), EMBED_BATCH_SIZE):
-        if not MOCK and batches_this_window >= MAX_BATCHES_PER_WINDOW:
-            elapsed = time.monotonic() - window_start
-            if elapsed < RATE_WINDOW_SECONDS:
-                time.sleep(RATE_WINDOW_SECONDS - elapsed)
-            window_start = time.monotonic()
-            batches_this_window = 0
+    try:
+        for start in range(0, len(new_rows), EMBED_BATCH_SIZE):
+            if not MOCK and batches_this_window >= MAX_BATCHES_PER_WINDOW:
+                elapsed = time.monotonic() - window_start
+                if elapsed < RATE_WINDOW_SECONDS:
+                    time.sleep(RATE_WINDOW_SECONDS - elapsed)
+                window_start = time.monotonic()
+                batches_this_window = 0
 
-        batch = embed_texts[start : start + EMBED_BATCH_SIZE]
-        batch_ids = new_ids[start : start + EMBED_BATCH_SIZE]
-        vectors = embed(batch, input_type="search_document")
-        for card_id, vec in zip(batch_ids, vectors):
-            store.upsert(card_id, vec)
-        embed_calls += 1
-        batches_this_window += 1
-    store.save()
+            batch_rows = new_rows[start : start + EMBED_BATCH_SIZE]
+            batch_texts = [f"{r['japanese']} ||| {r['english']}" for r in batch_rows]
+            vectors = embed(batch_texts, input_type="search_document")
+            embed_calls += 1
+            batches_this_window += 1
 
-    return ImportResult(imported=len(new_rows), skipped_duplicates=skipped, embed_calls=embed_calls)
+            batch_ids = _insert_batch(batch_rows)
+            for card_id, vec in zip(batch_ids, vectors):
+                store.upsert(card_id, vec)
+            store.save()
+            imported += len(batch_rows)
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                f"Cohere API error during import: {e}. {imported} of {len(new_rows)} new "
+                "cards were imported and embedded before the failure; re-run the import "
+                "to pick up the rest — already-imported cards will be skipped as duplicates."
+            ),
+        ) from e
+
+    return ImportResult(imported=imported, skipped_duplicates=skipped, embed_calls=embed_calls)
 
 
 @router.post("/import", response_model=ImportResult)
