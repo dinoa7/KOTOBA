@@ -1,5 +1,101 @@
 const API = "";
 
+// ---------- sound effects ----------
+const VOLUME_KEY = "kotoba-volume";
+const storedVolume = parseInt(localStorage.getItem(VOLUME_KEY), 10);
+let masterVolume = Number.isFinite(storedVolume) ? Math.min(100, Math.max(0, storedVolume)) : 70;
+let volumeBeforeMute = masterVolume || 70;
+
+let _ac = null;
+let _masterGain = null;
+function ac() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!_ac) {
+    _ac = new AC();
+    _masterGain = _ac.createGain();
+    _masterGain.gain.value = masterVolume / 100;
+    _masterGain.connect(_ac.destination);
+  }
+  if (_ac.state === "suspended") _ac.resume();
+  return _ac;
+}
+
+function setVolume(value) {
+  masterVolume = Math.min(100, Math.max(0, value));
+  localStorage.setItem(VOLUME_KEY, String(masterVolume));
+  if (_masterGain) _masterGain.gain.value = masterVolume / 100;
+
+  const slider = document.getElementById("volume-slider");
+  slider.value = masterVolume;
+  slider.style.background = `linear-gradient(to right, var(--accent) ${masterVolume}%, var(--border) ${masterVolume}%)`;
+  document.getElementById("volume-icon").classList.toggle("muted", masterVolume === 0);
+}
+
+document.getElementById("volume-slider").addEventListener("input", (e) => {
+  setVolume(parseInt(e.target.value, 10));
+});
+
+document.getElementById("volume-icon").addEventListener("click", () => {
+  if (masterVolume > 0) {
+    volumeBeforeMute = masterVolume;
+    setVolume(0);
+  } else {
+    setVolume(volumeBeforeMute || 70);
+  }
+});
+
+setVolume(masterVolume);
+
+function playSwoosh() {
+  const ctx = ac();
+  if (!ctx) return;
+  const dur = 0.35;
+  const t = ctx.currentTime;
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const filt = ctx.createBiquadFilter();
+  filt.type = "bandpass";
+  filt.Q.value = 0.8;
+  filt.frequency.setValueAtTime(1400, t);
+  filt.frequency.exponentialRampToValueAtTime(350, t + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.06, t + 0.06);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(filt);
+  filt.connect(g);
+  g.connect(_masterGain);
+  src.start(t);
+  src.stop(t + dur);
+}
+
+function playBell(quality) {
+  const ctx = ac();
+  if (!ctx) return;
+  const freq = { 0: 440, 2: 523.25, 3: 659.25, 4: 783.99, 5: 987.77 }[quality] || 659.25;
+  const t = ctx.currentTime;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.07, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+  g.connect(_masterGain);
+  [[1, 1], [2.76, 0.25]].forEach(([mult, amp]) => {
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.value = freq * mult;
+    const og = ctx.createGain();
+    og.gain.value = amp;
+    o.connect(og);
+    og.connect(g);
+    o.start(t);
+    o.stop(t + 0.6);
+  });
+}
+
 // ---------- tabs ----------
 let panelAnimFlip = false;
 
@@ -77,6 +173,7 @@ document.addEventListener("click", async (e) => {
   const btn = e.target;
   const japanese = btn.dataset.japanese;
   const slot = document.getElementById(btn.dataset.target);
+  btn.classList.add("hidden");
   slot.textContent = "Loading...";
   try {
     const data = await apiFetch(`${API}/breakdown`, {
@@ -147,6 +244,7 @@ function showCard() {
   document.getElementById("rv-grades").classList.add("hidden");
   document.getElementById("rv-show-wrap").classList.remove("hidden");
   document.getElementById("rv-breakdown-table").innerHTML = "";
+  document.getElementById("rv-breakdown-btn").classList.remove("hidden");
   document.getElementById("rv-play-audio").classList.add("hidden");
 
   currentCard = dueQueue.shift() || null;
@@ -188,6 +286,7 @@ document.getElementById("rv-play-audio").addEventListener("click", () => {
 });
 
 function revealCard() {
+  playSwoosh();
   document.getElementById("rv-reveal").classList.remove("hidden");
   document.getElementById("rv-grades").classList.remove("hidden");
   document.getElementById("rv-show-wrap").classList.add("hidden");
@@ -195,7 +294,8 @@ function revealCard() {
 
 document.getElementById("rv-show").addEventListener("click", revealCard);
 
-document.getElementById("rv-breakdown-btn").addEventListener("click", async () => {
+document.getElementById("rv-breakdown-btn").addEventListener("click", async (e) => {
+  e.target.classList.add("hidden");
   const el = document.getElementById("rv-breakdown-table");
   el.textContent = "Loading...";
   try {
@@ -213,6 +313,7 @@ document.getElementById("rv-breakdown-btn").addEventListener("click", async () =
 async function gradeCard(quality) {
   if (grading || !currentCard) return;
   grading = true;
+  playBell(quality);
   const gradedCard = currentCard;
 
   const cardEl = document.getElementById("review-card");
@@ -295,19 +396,32 @@ document.getElementById("drill-btn").addEventListener("click", async () => {
     });
     resultsEl.innerHTML = data.sentences
       .map(
-        (s, i) => `<div class="result-item">
-          <strong>${i + 1}. ${s.english}</strong>
-          <details><summary>Reveal</summary>
-            <div class="jp-text" style="font-size:1.2rem">${s.japanese}</div>
+        (s, i) => `<div class="result-item drill-item">
+          <div class="drill-head">
+            <span class="drill-number">${i + 1}</span>
+            <div class="drill-english">${s.english}</div>
+          </div>
+          <div class="drill-body hidden">
+            <div class="jp-text">${s.japanese}</div>
             <div class="reading">${s.hiragana}</div>
             ${renderBreakdownTable(s.breakdown)}
-          </details>
+          </div>
+          <div class="drill-toggle-wrap">
+            <button class="drill-toggle-btn">Reveal answer</button>
+          </div>
         </div>`
       )
       .join("") || "<p>No drill sentences generated — try a different grammar point.</p>";
   } catch (err) {
     resultsEl.textContent = err.message || "AI unavailable — drill generation requires the Cohere API.";
   }
+});
+
+document.getElementById("drill-results").addEventListener("click", (e) => {
+  if (!e.target.classList.contains("drill-toggle-btn")) return;
+  const body = e.target.closest(".drill-item").querySelector(".drill-body");
+  const nowHidden = body.classList.toggle("hidden");
+  e.target.textContent = nowHidden ? "Reveal answer" : "Hide";
 });
 
 // ---------- confusions ----------

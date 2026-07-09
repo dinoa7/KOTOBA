@@ -97,6 +97,71 @@ header {
 }
 .tab-btn.active { color: var(--bg); font-weight: 700; }
 
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-2);
+  padding: 7px 16px 7px 12px;
+  border-radius: 999px;
+}
+
+.volume-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 150ms;
+}
+.volume-icon:hover { color: var(--accent); }
+.volume-icon .vol-wave { transition: opacity 150ms; }
+.volume-icon.muted { color: var(--muted-3); }
+.volume-icon.muted .vol-wave { opacity: 0; }
+
+.volume-control input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 88px;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--accent) 70%, var(--border) 70%);
+  cursor: pointer;
+}
+.volume-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 0 var(--accent-dark);
+  cursor: pointer;
+  transition: transform 120ms;
+}
+.volume-control input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.15); }
+.volume-control input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+}
+.volume-control input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.volume-control input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+}
+
 .badge {
   background: #5A2D2D;
   color: #F0B4B4;
@@ -257,7 +322,7 @@ button {
 .grade-btn[data-q="4"] { background: #74904C; }
 .grade-btn[data-q="5"] { background: #477A50; }
 
-.breakdown-btn {
+.breakdown-btn, .drill-toggle-btn {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--muted);
@@ -268,7 +333,7 @@ button {
   margin-top: 4px;
   transition: border-color 150ms, color 150ms;
 }
-.breakdown-btn:hover { border-color: var(--accent); color: var(--accent); }
+.breakdown-btn:hover, .drill-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
 .breakdown-slot:not(:empty) { margin-top: 8px; }
 /* .result-item's flex-column stretches direct children to full width by
    default (align-items:stretch) — pull the badge/button back to natural
@@ -348,6 +413,26 @@ td:nth-child(4), td:nth-child(6) { color: var(--muted); }
 }
 .confusion-vs .line { flex: 1; height: 1px; background: var(--border-soft); }
 .confusion-vs span { color: var(--muted-4); font-size: 12px; font-weight: 700; }
+
+.drill-head { display: flex; align-items: baseline; gap: 12px; }
+.drill-number {
+  background: var(--accent-soft);
+  color: var(--accent);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.drill-english { font-size: 17px; font-weight: 700; }
+.drill-body { margin-top: 14px; padding-left: 40px; }
+.drill-body .jp-text { font-size: 24px; }
+.reading { color: var(--accent); font-size: 16px; margin-top: 4px; }
+.drill-toggle-wrap { margin-top: 12px; padding-left: 40px; }
 
 /* ---------- import ---------- */
 .import-card {

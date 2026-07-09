@@ -2,8 +2,36 @@
 
 A personal Japanese flashcard trainer that uses Cohere's Embed, Rerank, and
 Command models to turn a flat deck of cards into a semantic, adaptive study
-tool. See [KOTOBA_Build_Spec.md](KOTOBA_Build_Spec.md) for the full design
-rationale.
+tool.
+
+## The problem
+
+Flashcard apps treat cards as isolated facts. They can't answer "show me
+every card that uses the て-form," can't warn that 帰る and 変える keep
+colliding in your head, and can't generate a fresh practice sentence using
+only vocabulary you've already learned. A deck of N cards contains far more
+structure than N facts — surfacing it takes a language model.
+
+Every AI-generated output in KOTOBA follows one fixed study format: original
+Japanese → full hiragana reading → a word-by-word breakdown table with
+grammar notes.
+
+## Features
+
+- **Review** — SM-2 spaced repetition, entirely offline. A "Breakdown"
+  button on any card hits the (usually cached) breakdown endpoint.
+- **Search** — semantic, not keyword: embed the query, rank locally by
+  cosine similarity, rerank the top candidates. Works in Japanese or
+  English, and understands typed romaji ("te" → て) without corrupting real
+  English queries.
+- **Drill** — generates fresh practice sentences constrained to vocabulary
+  you've already reviewed at least twice, targeting a grammar point you
+  choose — no word outside your own known-vocab list is ever used.
+- **Confusions** — pure local math, zero API calls: pairwise cosine
+  similarity across every card, cross-referenced with lapse counts, surfaces
+  pairs you keep mixing up so they can be drilled side by side.
+- **Import** — raw Anki `.apkg` (sentence + audio extracted directly) or
+  CSV.
 
 ## Why Cohere
 
@@ -73,10 +101,10 @@ the full suite runs offline against canned Cohere fixtures
 
 ## Budget
 
-Trial tier: 1,000 Cohere calls/month. See §6 of the build spec for the math —
-daily use (imports once, ~5 breakdowns/day, ~3 drills/day, ~2 searches/day)
-lands around 366 calls/month. `GET /api/stats` reports real logged latency
-and call counts from the `api_log` table.
+Trial tier: 1,000 Cohere calls/month. Daily use (imports once, ~5
+breakdowns/day, ~3 drills/day, ~2 searches/day) lands around 366 calls/month.
+`GET /api/stats` reports real logged latency and call counts from the
+`api_log` table.
 
 ## Design decisions
 
@@ -114,9 +142,3 @@ and call counts from the `api_log` table.
   of history. Session-local only (an in-memory JS array, not persisted) —
   restarting the page resets it, same as Anki's learning queue
   ([frontend/app.js](frontend/app.js)).
-
----
-
-*Setup steps that happen outside the editor — installing Python, getting a
-Cohere API key, running the server, etc. — are documented in the "Outside
-VS Code" section of [KOTOBA_Build_Spec.md](KOTOBA_Build_Spec.md#appendix-outside-vs-code-what-to-do-outside-the-editor).*
