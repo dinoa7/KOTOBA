@@ -1,14 +1,38 @@
 const API = "";
 
 // ---------- tabs ----------
+let panelAnimFlip = false;
+
+function positionTabIndicator() {
+  const active = document.querySelector(".tab-btn.active");
+  const indicator = document.getElementById("tab-indicator");
+  if (!active || !indicator) return;
+  indicator.style.left = active.offsetLeft + "px";
+  indicator.style.top = active.offsetTop + "px";
+  indicator.style.width = active.offsetWidth + "px";
+  indicator.style.height = active.offsetHeight + "px";
+}
+
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
+    if (btn.classList.contains("active")) return;
     document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
     document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+    positionTabIndicator();
+
+    panelAnimFlip = !panelAnimFlip;
+    const wrap = document.getElementById("panel-anim-wrap");
+    wrap.classList.remove("anim-a", "anim-b");
+    void wrap.offsetWidth; // restart animation
+    wrap.classList.add(panelAnimFlip ? "anim-a" : "anim-b");
   });
 });
+
+window.addEventListener("resize", positionTabIndicator);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(positionTabIndicator);
+positionTabIndicator();
 
 function setOffline(isOffline) {
   document.getElementById("offline-badge").classList.toggle("hidden", !isOffline);
@@ -44,7 +68,7 @@ let breakdownSlotCounter = 0;
 
 function renderBreakdownButton(japanese) {
   const slotId = `bd-slot-${breakdownSlotCounter++}`;
-  return `<button class="breakdown-btn" data-japanese="${escapeAttr(japanese)}" data-target="${slotId}">Break this down</button>
+  return `<button class="breakdown-btn" data-japanese="${escapeAttr(japanese)}" data-target="${slotId}">Breakdown ↴</button>
     <div id="${slotId}" class="breakdown-slot"></div>`;
 }
 
@@ -84,6 +108,8 @@ function renderBreakdownTable(breakdown) {
 // ---------- review ----------
 let dueQueue = [];
 let currentCard = null;
+let sessionPosition = 1;
+let grading = false;
 
 // How many other cards get shown before a just-graded card resurfaces this
 // session. This is separate from — and in addition to — the long-term SM-2
@@ -112,28 +138,43 @@ function computeRequeueDistance(quality, repetitions) {
 
 async function loadDue() {
   dueQueue = await apiFetch(`${API}/review/due`);
-  nextCard();
+  sessionPosition = 1;
+  showCard();
 }
 
-function nextCard() {
+function showCard() {
   document.getElementById("rv-reveal").classList.add("hidden");
   document.getElementById("rv-grades").classList.add("hidden");
-  document.getElementById("rv-show").classList.remove("hidden");
+  document.getElementById("rv-show-wrap").classList.remove("hidden");
   document.getElementById("rv-breakdown-table").innerHTML = "";
+  document.getElementById("rv-play-audio").classList.add("hidden");
 
   currentCard = dueQueue.shift() || null;
-  const cardEl = document.getElementById("review-card");
+  const cardWrap = document.getElementById("review-card-wrap");
+  const sessionBar = document.getElementById("review-session-bar");
   const emptyEl = document.getElementById("review-empty");
 
   if (!currentCard) {
-    cardEl.classList.add("hidden");
+    cardWrap.classList.add("hidden");
+    sessionBar.classList.add("hidden");
     emptyEl.classList.remove("hidden");
     return;
   }
   emptyEl.classList.add("hidden");
-  cardEl.classList.remove("hidden");
+  cardWrap.classList.remove("hidden");
+  sessionBar.classList.remove("hidden");
+  document.getElementById("rv-position").textContent = sessionPosition;
   document.getElementById("rv-japanese").textContent = currentCard.japanese;
-  document.getElementById("rv-audio").innerHTML = renderAudio(currentCard.audio_path);
+
+  const audioEl = document.getElementById("rv-audio-el");
+  const playBtn = document.getElementById("rv-play-audio");
+  if (currentCard.audio_path) {
+    audioEl.src = `/audio/${encodeURIComponent(currentCard.audio_path)}`;
+    playBtn.classList.remove("hidden");
+  } else {
+    audioEl.removeAttribute("src");
+  }
+
   document.getElementById("rv-reading").textContent = currentCard.reading || "";
   document.getElementById("rv-english").textContent = currentCard.english;
   const count = currentCard.review_count || 0;
@@ -141,11 +182,18 @@ function nextCard() {
     count === 0 ? "New card" : `Reviewed ${count} time${count === 1 ? "" : "s"}`;
 }
 
-document.getElementById("rv-show").addEventListener("click", () => {
+document.getElementById("rv-play-audio").addEventListener("click", () => {
+  const audioEl = document.getElementById("rv-audio-el");
+  if (audioEl.src) audioEl.play();
+});
+
+function revealCard() {
   document.getElementById("rv-reveal").classList.remove("hidden");
   document.getElementById("rv-grades").classList.remove("hidden");
-  document.getElementById("rv-show").classList.add("hidden");
-});
+  document.getElementById("rv-show-wrap").classList.add("hidden");
+}
+
+document.getElementById("rv-show").addEventListener("click", revealCard);
 
 document.getElementById("rv-breakdown-btn").addEventListener("click", async () => {
   const el = document.getElementById("rv-breakdown-table");
@@ -162,23 +210,52 @@ document.getElementById("rv-breakdown-btn").addEventListener("click", async () =
   }
 });
 
-document.querySelectorAll(".grade-btn").forEach((btn) => {
-  btn.addEventListener("click", async () => {
-    const quality = parseInt(btn.dataset.q, 10);
-    const gradedCard = currentCard;
-    const result = await apiFetch(`${API}/review/grade`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ card_id: gradedCard.id, quality }),
-    });
+async function gradeCard(quality) {
+  if (grading || !currentCard) return;
+  grading = true;
+  const gradedCard = currentCard;
 
-    gradedCard.review_count = result.review_count;
-    const distance = computeRequeueDistance(quality, result.repetitions);
-    const insertAt = Math.min(dueQueue.length, distance);
-    dueQueue.splice(insertAt, 0, gradedCard);
+  const cardEl = document.getElementById("review-card");
+  cardEl.classList.add("anim-out");
 
-    nextCard();
+  const result = await apiFetch(`${API}/review/grade`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ card_id: gradedCard.id, quality }),
   });
+
+  gradedCard.review_count = result.review_count;
+  const distance = computeRequeueDistance(quality, result.repetitions);
+  const insertAt = Math.min(dueQueue.length, distance);
+  dueQueue.splice(insertAt, 0, gradedCard);
+  sessionPosition += 1;
+
+  setTimeout(() => {
+    showCard();
+    cardEl.classList.remove("anim-out");
+    cardEl.classList.add("anim-in");
+    setTimeout(() => {
+      cardEl.classList.remove("anim-in");
+      grading = false;
+    }, 340);
+  }, 230);
+}
+
+document.querySelectorAll(".grade-btn").forEach((btn) => {
+  btn.addEventListener("click", () => gradeCard(parseInt(btn.dataset.q, 10)));
+});
+
+document.addEventListener("keydown", (e) => {
+  if (!document.getElementById("tab-review").classList.contains("active")) return;
+  const tag = (e.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea") return;
+  const revealed = !document.getElementById("rv-reveal").classList.contains("hidden");
+  if (e.code === "Space" && !revealed && currentCard) {
+    e.preventDefault();
+    revealCard();
+  } else if (revealed && ["1", "2", "3", "4", "5"].includes(e.key)) {
+    gradeCard([0, 2, 3, 4, 5][parseInt(e.key, 10) - 1]);
+  }
 });
 
 // ---------- search ----------
@@ -193,7 +270,7 @@ document.getElementById("search-btn").addEventListener("click", async () => {
       .map(
         (r) => `<div class="result-item">
           <span class="score">${r.score.toFixed(3)}</span>
-          <div class="jp-text" style="font-size:1.2rem">${r.card.japanese}</div>
+          <div class="jp-text">${r.card.japanese}</div>
           ${renderAudio(r.card.audio_path)}
           <div class="english">${r.card.english}</div>
           ${renderBreakdownButton(r.card.japanese)}
@@ -244,6 +321,7 @@ document.getElementById("confusions-btn").addEventListener("click", async () => 
         <span class="score">sim ${p.similarity.toFixed(3)} · ${p.combined_lapses} lapses</span>
         <div>${p.card_a.japanese} <span class="english">(${p.card_a.english})</span></div>
         ${renderBreakdownButton(p.card_a.japanese)}
+        <div class="confusion-vs"><div class="line"></div><span>VS</span><div class="line"></div></div>
         <div>${p.card_b.japanese} <span class="english">(${p.card_b.english})</span></div>
         ${renderBreakdownButton(p.card_b.japanese)}
       </div>`
@@ -270,18 +348,21 @@ document.getElementById("import-btn").addEventListener("click", async () => {
 });
 
 document.getElementById("add-btn").addEventListener("click", async () => {
-  const payload = {
-    japanese: document.getElementById("add-japanese").value.trim(),
-    reading: document.getElementById("add-reading").value.trim(),
-    english: document.getElementById("add-english").value.trim(),
-    tags: document.getElementById("add-tags").value.trim(),
-  };
-  if (!payload.japanese || !payload.english) return;
+  const japanese = document.getElementById("add-japanese").value.trim();
+  const english = document.getElementById("add-english").value.trim();
+  const resultEl = document.getElementById("add-result");
+  if (!japanese || !english) return;
   await apiFetch(`${API}/cards`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      japanese,
+      english,
+      reading: document.getElementById("add-reading").value.trim(),
+      tags: document.getElementById("add-tags").value.trim(),
+    }),
   });
+  resultEl.textContent = `Added 「${japanese}」`;
   ["add-japanese", "add-reading", "add-english", "add-tags"].forEach(
     (id) => (document.getElementById(id).value = "")
   );

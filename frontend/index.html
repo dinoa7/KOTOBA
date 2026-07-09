@@ -4,12 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KOTOBA — 言葉</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@700&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
-  <h1>KOTOBA <span class="jp">言葉</span></h1>
-  <nav>
+  <div class="brand">
+    <div class="hanko">言葉</div>
+    <div class="wordmark">KOTOBA</div>
+  </div>
+  <nav id="tab-nav">
+    <div id="tab-indicator"></div>
     <button data-tab="review" class="tab-btn active">Review</button>
     <button data-tab="search" class="tab-btn">Search</button>
     <button data-tab="drill" class="tab-btn">Drill</button>
@@ -20,71 +27,110 @@
 </header>
 
 <main>
+  <div id="panel-anim-wrap">
+
   <!-- REVIEW -->
   <section id="tab-review" class="tab-panel active">
     <div id="review-empty" class="hidden">No cards due. Nice work.</div>
-    <div id="review-card" class="card hidden">
-      <div id="rv-review-count" class="review-count"></div>
-      <div class="jp-text" id="rv-japanese"></div>
-      <div id="rv-audio"></div>
-      <div id="rv-reveal" class="hidden">
-        <div class="reading" id="rv-reading"></div>
-        <div class="english" id="rv-english"></div>
-        <button id="rv-breakdown-btn">Break this down</button>
-        <div id="rv-breakdown-table"></div>
+    <div id="review-session-bar" class="session-bar hidden">
+      <span class="session-label">Session <span class="session-position">· card <span id="rv-position">1</span></span></span>
+      <span id="rv-review-count" class="review-count-pill"></span>
+    </div>
+    <div id="review-card-wrap" class="hidden">
+      <div id="review-card" class="card">
+        <div class="jp-text" id="rv-japanese"></div>
+        <div class="audio-row">
+          <button id="rv-play-audio" class="pill-ghost hidden">▶ Play audio</button>
+          <audio id="rv-audio-el" preload="none"></audio>
+        </div>
+        <div id="rv-reveal" class="hidden">
+          <div class="reading-pill" id="rv-reading"></div>
+          <div class="english" id="rv-english"></div>
+          <button id="rv-breakdown-btn" class="pill-dark">Breakdown ↴</button>
+          <div id="rv-breakdown-table"></div>
+        </div>
       </div>
-      <div class="controls">
-        <button id="rv-show">Show Answer</button>
-        <div id="rv-grades" class="hidden">
-          <span>Grade:</span>
+    </div>
+    <div class="controls">
+      <div id="rv-show-wrap" class="hidden">
+        <button id="rv-show" class="pill-accent pill-big">Show Answer</button>
+        <div class="kbd-hint">press <b>space</b> to flip</div>
+      </div>
+      <div id="rv-grades" class="hidden">
+        <div class="grade-row">
           <button class="grade-btn" data-q="0">Very Hard</button>
           <button class="grade-btn" data-q="2">Hard</button>
           <button class="grade-btn" data-q="3">Medium</button>
           <button class="grade-btn" data-q="4">Easy</button>
           <button class="grade-btn" data-q="5">Very Easy</button>
         </div>
+        <div class="kbd-hint">press <b>1–5</b> to grade</div>
       </div>
     </div>
   </section>
 
   <!-- SEARCH -->
   <section id="tab-search" class="tab-panel">
-    <input id="search-input" type="text" placeholder="て form requests, counting people, sounds like かえる...">
-    <button id="search-btn">Search</button>
+    <div class="input-row">
+      <input id="search-input" type="text" placeholder="て form requests, counting people, sounds like かえる...">
+      <button id="search-btn" class="pill-accent">Search</button>
+    </div>
+    <div class="tab-subtext">Semantic search across your deck — meaning, grammar, or romaji.</div>
     <div id="search-results"></div>
   </section>
 
   <!-- DRILL -->
   <section id="tab-drill" class="tab-panel">
-    <input id="drill-grammar" type="text" placeholder="grammar point, e.g. te-form request" value="て-form request">
-    <button id="drill-btn">Generate Drill</button>
+    <div class="input-row">
+      <input id="drill-grammar" type="text" placeholder="grammar point, e.g. te-form request" value="て-form request">
+      <button id="drill-btn" class="pill-accent">Generate Drill</button>
+    </div>
+    <div class="tab-subtext">Fresh practice sentences built only from vocabulary you already know.</div>
     <div id="drill-results"></div>
   </section>
 
   <!-- CONFUSIONS -->
   <section id="tab-confusions" class="tab-panel">
-    <button id="confusions-btn">Find Confusions</button>
+    <div class="input-row confusions-row">
+      <button id="confusions-btn" class="pill-accent">Find Confusions</button>
+      <div class="tab-subtext">Pairs of cards you keep mixing up — similar meaning, both lapsing.</div>
+    </div>
     <div id="confusions-results"></div>
   </section>
 
   <!-- IMPORT -->
   <section id="tab-import" class="tab-panel">
-    <p>Raw Anki <code>.apkg</code> (recommended, includes audio), or CSV: <code>japanese,reading,english,tags</code></p>
-    <input id="import-file" type="file" accept=".apkg,.csv,.txt">
-    <button id="import-btn">Import</button>
-    <div id="import-result"></div>
-    <hr>
-    <h3>Add a single card</h3>
-    <input id="add-japanese" placeholder="japanese">
-    <input id="add-reading" placeholder="reading (optional)">
-    <input id="add-english" placeholder="english">
-    <input id="add-tags" placeholder="tags (comma-separated)">
-    <button id="add-btn">Add Card</button>
+    <div class="card import-card">
+      <div class="card-title">Import a deck</div>
+      <div class="card-subtext">Raw Anki <code>.apkg</code> (recommended — includes audio), or CSV: <code>japanese,reading,english,tags</code></div>
+      <div class="dropzone">
+        <input id="import-file" type="file" accept=".apkg,.csv,.txt">
+        <button id="import-btn" class="pill-accent">Import</button>
+      </div>
+      <div id="import-result" class="result-text"></div>
+    </div>
+
+    <div class="card import-card">
+      <div class="card-title">Add a single card</div>
+      <div class="add-grid">
+        <input id="add-japanese" placeholder="japanese">
+        <input id="add-reading" placeholder="reading (optional)">
+        <input id="add-english" placeholder="english">
+        <input id="add-tags" placeholder="tags (comma-separated)">
+      </div>
+      <div class="add-row">
+        <button id="add-btn" class="pill-dark">Add Card</button>
+        <div id="add-result" class="result-text"></div>
+      </div>
+    </div>
   </section>
+
+  </div>
 </main>
 
 <footer>
   <span id="stats-line"></span>
+  <span>SM-2 · AI online</span>
 </footer>
 
 <script src="app.js"></script>
