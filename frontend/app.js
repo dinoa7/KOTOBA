@@ -26,6 +26,9 @@ function setVolume(value) {
   localStorage.setItem(VOLUME_KEY, String(masterVolume));
   if (_masterGain) _masterGain.gain.value = masterVolume / 100;
 
+  const audioEl = document.getElementById("rv-audio-el");
+  if (audioEl) audioEl.volume = masterVolume / 100;
+
   const slider = document.getElementById("volume-slider");
   slider.value = masterVolume;
   slider.style.background = `linear-gradient(to right, var(--accent) ${masterVolume}%, var(--border) ${masterVolume}%)`;
@@ -34,6 +37,10 @@ function setVolume(value) {
 
 document.getElementById("volume-slider").addEventListener("input", (e) => {
   setVolume(parseInt(e.target.value, 10));
+});
+
+document.getElementById("volume-slider").addEventListener("change", (e) => {
+  e.target.blur();
 });
 
 document.getElementById("volume-icon").addEventListener("click", () => {
