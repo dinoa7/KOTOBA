@@ -124,6 +124,7 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.classList.add("active");
     document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
     positionTabIndicator();
+    if (btn.dataset.tab === "recent") loadRecent();
 
     panelAnimFlip = !panelAnimFlip;
     const wrap = document.getElementById("panel-anim-wrap");
@@ -160,8 +161,17 @@ async function apiFetch(url, options) {
 
 function renderAudio(audioPath) {
   if (!audioPath) return "";
-  return `<audio controls src="/audio/${encodeURIComponent(audioPath)}" style="display:block;margin:0.6rem auto;"></audio>`;
+  return `<div class="audio-row"><button class="pill-ghost play-audio-btn" data-audio="/audio/${encodeURIComponent(audioPath)}">▶ Play audio</button></div>`;
 }
+
+let sharedAudioEl = null;
+
+document.addEventListener("click", (e) => {
+  if (!e.target.classList.contains("play-audio-btn")) return;
+  if (!sharedAudioEl) sharedAudioEl = new Audio();
+  sharedAudioEl.src = e.target.dataset.audio;
+  sharedAudioEl.play();
+});
 
 function escapeAttr(str) {
   return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -171,9 +181,29 @@ let breakdownSlotCounter = 0;
 
 function renderBreakdownButton(japanese) {
   const slotId = `bd-slot-${breakdownSlotCounter++}`;
-  return `<button class="breakdown-btn" data-japanese="${escapeAttr(japanese)}" data-target="${slotId}">Breakdown ↴</button>
+  return `<button class="breakdown-btn pill-dark" data-japanese="${escapeAttr(japanese)}" data-target="${slotId}">Breakdown ↴</button>
     <div id="${slotId}" class="breakdown-slot"></div>`;
 }
+
+// Same reading-pill + translation + breakdown reveal, gated behind a Show
+// Answer button, used everywhere a card's Japanese is shown up front —
+// mirrors the Review tab's reveal flow instead of exposing the answer immediately.
+function renderRevealBlock(card) {
+  return `<button class="pill-accent show-answer-btn">Show Answer</button>
+    <div class="result-reveal hidden">
+      ${card.reading ? `<div class="reading-pill">${card.reading}</div>` : ""}
+      <div class="english">${card.english}</div>
+      ${renderBreakdownButton(card.japanese)}
+    </div>`;
+}
+
+document.addEventListener("click", (e) => {
+  if (!e.target.classList.contains("show-answer-btn")) return;
+  const reveal = e.target.nextElementSibling;
+  const nowHidden = reveal.classList.toggle("hidden");
+  if (!nowHidden) playSwoosh();
+  e.target.textContent = nowHidden ? "Show Answer" : "Minimize";
+});
 
 document.addEventListener("click", async (e) => {
   if (!e.target.classList.contains("breakdown-btn")) return;
@@ -214,6 +244,7 @@ let dueQueue = [];
 let currentCard = null;
 let sessionPosition = 1;
 let grading = false;
+let lastGraded = null;
 
 // How many other cards get shown before a just-graded card resurfaces this
 // session. This is separate from — and in addition to — the long-term SM-2
@@ -243,6 +274,8 @@ function computeRequeueDistance(quality, repetitions) {
 async function loadDue() {
   dueQueue = await apiFetch(`${API}/review/due`);
   sessionPosition = 1;
+  lastGraded = null;
+  document.getElementById("rv-back-btn").classList.add("hidden");
   showCard();
 }
 
@@ -268,21 +301,26 @@ function showCard() {
   emptyEl.classList.add("hidden");
   cardWrap.classList.remove("hidden");
   sessionBar.classList.remove("hidden");
+  populateCardDOM(currentCard);
+}
+
+function populateCardDOM(card) {
   document.getElementById("rv-position").textContent = sessionPosition;
-  document.getElementById("rv-japanese").textContent = currentCard.japanese;
+  document.getElementById("rv-japanese").textContent = card.japanese;
 
   const audioEl = document.getElementById("rv-audio-el");
   const playBtn = document.getElementById("rv-play-audio");
-  if (currentCard.audio_path) {
-    audioEl.src = `/audio/${encodeURIComponent(currentCard.audio_path)}`;
+  if (card.audio_path) {
+    audioEl.src = `/audio/${encodeURIComponent(card.audio_path)}`;
     playBtn.classList.remove("hidden");
   } else {
     audioEl.removeAttribute("src");
+    playBtn.classList.add("hidden");
   }
 
-  document.getElementById("rv-reading").textContent = currentCard.reading || "";
-  document.getElementById("rv-english").textContent = currentCard.english;
-  const count = currentCard.review_count || 0;
+  document.getElementById("rv-reading").textContent = card.reading || "";
+  document.getElementById("rv-english").textContent = card.english;
+  const count = card.review_count || 0;
   document.getElementById("rv-review-count").textContent =
     count === 0 ? "New card" : `Reviewed ${count} time${count === 1 ? "" : "s"}`;
 }
@@ -322,6 +360,7 @@ async function gradeCard(quality) {
   grading = true;
   playBell(quality);
   const gradedCard = currentCard;
+  lastGraded = { card: gradedCard, prevReviewCount: gradedCard.review_count };
 
   const cardEl = document.getElementById("review-card");
   cardEl.classList.add("anim-out");
@@ -337,6 +376,7 @@ async function gradeCard(quality) {
   const insertAt = Math.min(dueQueue.length, distance);
   dueQueue.splice(insertAt, 0, gradedCard);
   sessionPosition += 1;
+  document.getElementById("rv-back-btn").classList.remove("hidden");
 
   setTimeout(() => {
     showCard();
@@ -353,6 +393,40 @@ document.querySelectorAll(".grade-btn").forEach((btn) => {
   btn.addEventListener("click", () => gradeCard(parseInt(btn.dataset.q, 10)));
 });
 
+async function goBack() {
+  if (!lastGraded || grading) return;
+  grading = true;
+  playSwoosh(); // fire before the await — same sound as Show Answer, and keeps it tied to the click gesture
+  try {
+    await apiFetch(`${API}/review/undo`, { method: "POST" });
+  } catch (err) {
+    grading = false;
+    return;
+  }
+
+  const idx = dueQueue.indexOf(lastGraded.card);
+  if (idx !== -1) dueQueue.splice(idx, 1);
+  if (currentCard) dueQueue.unshift(currentCard);
+
+  lastGraded.card.review_count = lastGraded.prevReviewCount;
+  currentCard = lastGraded.card;
+  sessionPosition = Math.max(1, sessionPosition - 1);
+
+  document.getElementById("review-empty").classList.add("hidden");
+  document.getElementById("review-card-wrap").classList.remove("hidden");
+  document.getElementById("review-session-bar").classList.remove("hidden");
+  populateCardDOM(currentCard);
+  document.getElementById("rv-reveal").classList.remove("hidden");
+  document.getElementById("rv-grades").classList.remove("hidden");
+  document.getElementById("rv-show-wrap").classList.add("hidden");
+
+  lastGraded = null;
+  document.getElementById("rv-back-btn").classList.add("hidden");
+  grading = false;
+}
+
+document.getElementById("rv-back-btn").addEventListener("click", goBack);
+
 document.addEventListener("keydown", (e) => {
   if (!document.getElementById("tab-review").classList.contains("active")) return;
   const tag = (e.target.tagName || "").toLowerCase();
@@ -363,6 +437,9 @@ document.addEventListener("keydown", (e) => {
     revealCard();
   } else if (revealed && ["1", "2", "3", "4", "5"].includes(e.key)) {
     gradeCard([0, 2, 3, 4, 5][parseInt(e.key, 10) - 1]);
+  } else if (e.code === "Backspace" && lastGraded) {
+    e.preventDefault();
+    goBack();
   }
 });
 
@@ -380,8 +457,7 @@ document.getElementById("search-btn").addEventListener("click", async () => {
           <span class="score">${r.score.toFixed(3)}</span>
           <div class="jp-text">${r.card.japanese}</div>
           ${renderAudio(r.card.audio_path)}
-          <div class="english">${r.card.english}</div>
-          ${renderBreakdownButton(r.card.japanese)}
+          ${renderRevealBlock(r.card)}
         </div>`
       )
       .join("") || "<p>No results.</p>";
@@ -410,11 +486,11 @@ document.getElementById("drill-btn").addEventListener("click", async () => {
           </div>
           <div class="drill-body hidden">
             <div class="jp-text">${s.japanese}</div>
-            <div class="reading">${s.hiragana}</div>
+            <div class="reading-pill">${s.hiragana}</div>
             ${renderBreakdownTable(s.breakdown)}
           </div>
           <div class="drill-toggle-wrap">
-            <button class="drill-toggle-btn">Reveal answer</button>
+            <button class="drill-toggle-btn pill-accent">Show Answer</button>
           </div>
         </div>`
       )
@@ -428,7 +504,8 @@ document.getElementById("drill-results").addEventListener("click", (e) => {
   if (!e.target.classList.contains("drill-toggle-btn")) return;
   const body = e.target.closest(".drill-item").querySelector(".drill-body");
   const nowHidden = body.classList.toggle("hidden");
-  e.target.textContent = nowHidden ? "Reveal answer" : "Hide";
+  if (!nowHidden) playSwoosh();
+  e.target.textContent = nowHidden ? "Show Answer" : "Minimize";
 });
 
 // ---------- confusions ----------
@@ -440,15 +517,46 @@ document.getElementById("confusions-btn").addEventListener("click", async () => 
     .map(
       (p) => `<div class="result-item">
         <span class="score">sim ${p.similarity.toFixed(3)} · ${p.combined_lapses} lapses</span>
-        <div>${p.card_a.japanese} <span class="english">(${p.card_a.english})</span></div>
-        ${renderBreakdownButton(p.card_a.japanese)}
+        <div class="jp-text">${p.card_a.japanese}</div>
+        ${renderRevealBlock(p.card_a)}
         <div class="confusion-vs"><div class="line"></div><span>VS</span><div class="line"></div></div>
-        <div>${p.card_b.japanese} <span class="english">(${p.card_b.english})</span></div>
-        ${renderBreakdownButton(p.card_b.japanese)}
+        <div class="jp-text">${p.card_b.japanese}</div>
+        ${renderRevealBlock(p.card_b)}
       </div>`
     )
     .join("") || "<p>No confusions detected yet.</p>";
 });
+
+// ---------- recent ----------
+const QUALITY_LABELS = { 0: "Very Hard", 2: "Hard", 3: "Medium", 4: "Easy", 5: "Very Easy" };
+
+function relativeTime(isoString) {
+  const graded = new Date(isoString + "Z"); // SQLite CURRENT_TIMESTAMP is UTC, no offset in the string
+  const seconds = Math.max(0, Math.floor((Date.now() - graded.getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+async function loadRecent() {
+  const resultsEl = document.getElementById("recent-results");
+  resultsEl.textContent = "Loading...";
+  const entries = await apiFetch(`${API}/review/recent?limit=20`);
+  resultsEl.innerHTML = entries
+    .map(
+      (entry) => `<div class="result-item">
+        <span class="score quality-badge" data-q="${entry.quality}">${QUALITY_LABELS[entry.quality] || entry.quality} · ${relativeTime(entry.graded_at)}</span>
+        <div class="jp-text">${entry.card.japanese}</div>
+        ${renderAudio(entry.card.audio_path)}
+        ${renderRevealBlock(entry.card)}
+      </div>`
+    )
+    .join("") || "<p>No cards reviewed yet.</p>";
+}
 
 // ---------- import ----------
 document.getElementById("import-btn").addEventListener("click", async () => {

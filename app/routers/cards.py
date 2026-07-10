@@ -1,4 +1,3 @@
-import csv
 import io
 import time
 from datetime import date
@@ -56,44 +55,12 @@ def create_card(card: CardIn):
 @router.delete("/{card_id}")
 def delete_card(card_id: int):
     with get_conn() as conn:
+        conn.execute("DELETE FROM review_log WHERE card_id = ?", (card_id,))
         conn.execute("DELETE FROM reviews WHERE card_id = ?", (card_id,))
         cur = conn.execute("DELETE FROM cards WHERE id = ?", (card_id,))
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="card not found")
     return {"deleted": card_id}
-
-
-def _parse_csv_rows(raw_text: str) -> list[dict]:
-    """Accepts CSV/tab-delimited: japanese,reading,english,tags[,headword,audio_path]."""
-    lines = [l for l in raw_text.splitlines() if l.strip() and not l.startswith("#")]
-    if not lines:
-        return []
-    delimiter = "\t" if "\t" in lines[0] else ","
-    reader = csv.reader(lines, delimiter=delimiter)
-    rows = []
-    for parts in reader:
-        parts = [p.strip() for p in parts]
-        if len(parts) < 2:
-            continue
-        japanese = parts[0]
-        if japanese.lower() == "japanese":
-            continue  # header row
-        reading = parts[1] if len(parts) > 1 else ""
-        english = parts[2] if len(parts) > 2 else (parts[1] if len(parts) == 2 else "")
-        tags = parts[3] if len(parts) > 3 else ""
-        headword = parts[4] if len(parts) > 4 else ""
-        audio_path = parts[5] if len(parts) > 5 and parts[5] else None
-        rows.append(
-            {
-                "japanese": japanese,
-                "reading": reading,
-                "english": english,
-                "tags": tags,
-                "headword": headword,
-                "audio_path": audio_path,
-            }
-        )
-    return rows
 
 
 def _parse_apkg_rows(raw_bytes: bytes, deck_tag: str) -> list[dict]:
@@ -183,11 +150,11 @@ async def import_cards(file: UploadFile):
     raw = await file.read()
     filename = file.filename or ""
 
-    if filename.lower().endswith(".apkg"):
-        deck_tag = Path(filename).stem.lower().replace(" ", "-")
-        parsed = _parse_apkg_rows(raw, deck_tag)
-    else:
-        parsed = _parse_csv_rows(raw.decode("utf-8"))
+    if not filename.lower().endswith(".apkg"):
+        raise HTTPException(status_code=400, detail="Only .apkg files are supported for import")
+
+    deck_tag = Path(filename).stem.lower().replace(" ", "-")
+    parsed = _parse_apkg_rows(raw, deck_tag)
 
     with get_conn() as conn:
         existing = {

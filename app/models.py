@@ -47,6 +47,12 @@ class SearchResult(BaseModel):
     score: float
 
 
+class RecentReview(BaseModel):
+    card: CardOut
+    quality: int
+    graded_at: str
+
+
 class Token(BaseModel):
     token: str
     reading: str

@@ -13,6 +13,11 @@
   --accent: #AE4038;
   --accent-dark: #8A2F28;
   --accent-soft: #F8EDE9;
+  --grade-0: #AE4038;
+  --grade-2: #C2703F;
+  --grade-3: #AD923F;
+  --grade-4: #74904C;
+  --grade-5: #477A50;
   font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
 }
 
@@ -316,29 +321,23 @@ button {
 }
 .grade-btn:hover { filter: brightness(0.92); }
 .grade-btn:active { transform: scale(0.96); }
-.grade-btn[data-q="0"] { background: #AE4038; }
-.grade-btn[data-q="2"] { background: #C2703F; }
-.grade-btn[data-q="3"] { background: #AD923F; }
-.grade-btn[data-q="4"] { background: #74904C; }
-.grade-btn[data-q="5"] { background: #477A50; }
+.grade-btn[data-q="0"] { background: var(--grade-0); }
+.grade-btn[data-q="2"] { background: var(--grade-2); }
+.grade-btn[data-q="3"] { background: var(--grade-3); }
+.grade-btn[data-q="4"] { background: var(--grade-4); }
+.grade-btn[data-q="5"] { background: var(--grade-5); }
 
-.breakdown-btn, .drill-toggle-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 6px 14px;
-  border-radius: 999px;
-  margin-top: 4px;
-  transition: border-color 150ms, color 150ms;
-}
-.breakdown-btn:hover, .drill-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+/* .breakdown-btn/.show-answer-btn get their color from .pill-dark/.pill-accent;
+   these rules are just the layout bits those shared classes don't provide. */
+.breakdown-btn { margin-top: 4px; }
+.drill-toggle-btn { margin-top: 8px; }
+.show-answer-btn { margin-top: 10px; }
+.result-reveal { margin-top: 10px; }
 .breakdown-slot:not(:empty) { margin-top: 8px; }
 /* .result-item's flex-column stretches direct children to full width by
-   default (align-items:stretch) — pull the badge/button back to natural
-   content size instead of a full-width bar. */
-.breakdown-btn { align-self: flex-start; }
+   default (align-items:stretch) — pull the button back to natural content
+   size and center it instead of a full-width bar. */
+.show-answer-btn { align-self: center; }
 
 /* ---------- inputs ---------- */
 .input-row { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -384,15 +383,27 @@ td:first-child { font-weight: 700; }
 td:nth-child(2) { color: var(--accent); }
 td:nth-child(4), td:nth-child(6) { color: var(--muted); }
 
-/* ---------- result cards (search / drill / confusions) ---------- */
+/* ---------- result cards (search / drill / confusions / recent) ---------- */
+/* Mirrors .card's centered, rounded look at a smaller scale — a narrower
+   max-width centered inside its (flex, centering) results-list container. */
+.results-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
 .result-item {
+  width: 100%;
+  max-width: 560px;
   background: var(--panel);
   border-radius: 16px;
   box-shadow: 0 2px 6px rgba(42, 36, 29, 0.06), 0 10px 24px rgba(42, 36, 29, 0.07);
-  padding: 20px 26px;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  text-align: center;
+  box-sizing: border-box;
 }
 .result-item .score {
   background: var(--panel-2);
@@ -403,6 +414,11 @@ td:nth-child(4), td:nth-child(6) { color: var(--muted); }
   font-weight: 700;
   align-self: flex-end;
 }
+.result-item .score.quality-badge[data-q="0"] { background: var(--grade-0); color: var(--bg); }
+.result-item .score.quality-badge[data-q="2"] { background: var(--grade-2); color: var(--bg); }
+.result-item .score.quality-badge[data-q="3"] { background: var(--grade-3); color: var(--bg); }
+.result-item .score.quality-badge[data-q="4"] { background: var(--grade-4); color: var(--bg); }
+.result-item .score.quality-badge[data-q="5"] { background: var(--grade-5); color: var(--bg); }
 .result-item .jp-text { font-size: 22px; }
 
 .confusion-vs {
@@ -414,7 +430,7 @@ td:nth-child(4), td:nth-child(6) { color: var(--muted); }
 .confusion-vs .line { flex: 1; height: 1px; background: var(--border-soft); }
 .confusion-vs span { color: var(--muted-4); font-size: 12px; font-weight: 700; }
 
-.drill-head { display: flex; align-items: baseline; gap: 12px; }
+.drill-head { display: flex; align-items: baseline; justify-content: center; gap: 12px; }
 .drill-number {
   background: var(--accent-soft);
   color: var(--accent);
@@ -429,10 +445,9 @@ td:nth-child(4), td:nth-child(6) { color: var(--muted); }
   flex-shrink: 0;
 }
 .drill-english { font-size: 17px; font-weight: 700; }
-.drill-body { margin-top: 14px; padding-left: 40px; }
+.drill-body { margin-top: 14px; }
 .drill-body .jp-text { font-size: 24px; }
-.reading { color: var(--accent); font-size: 16px; margin-top: 4px; }
-.drill-toggle-wrap { margin-top: 12px; padding-left: 40px; }
+.drill-toggle-wrap { margin-top: 12px; }
 
 /* ---------- import ---------- */
 .import-card {

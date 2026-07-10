@@ -25,6 +25,15 @@ CREATE TABLE IF NOT EXISTS reviews (
     total_reviews INTEGER DEFAULT 0  -- monotonic count of every grade ever given, pass or fail
 );
 
+CREATE TABLE IF NOT EXISTS review_log (
+    id INTEGER PRIMARY KEY,
+    card_id INTEGER NOT NULL REFERENCES cards(id),
+    quality INTEGER NOT NULL,
+    prev_easiness REAL, prev_interval_days INTEGER, prev_repetitions INTEGER,
+    prev_due_date TEXT, prev_lapses INTEGER, prev_total_reviews INTEGER,
+    graded_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS breakdown_cache (
     sentence_hash TEXT PRIMARY KEY,
     breakdown_json TEXT NOT NULL,

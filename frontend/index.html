@@ -24,6 +24,7 @@
     <button data-tab="search" class="tab-btn">Search</button>
     <button data-tab="drill" class="tab-btn">Drill</button>
     <button data-tab="confusions" class="tab-btn">Confusions</button>
+    <button data-tab="recent" class="tab-btn">Recent</button>
     <button data-tab="import" class="tab-btn">Import</button>
   </nav>
   <div class="volume-control">
@@ -47,6 +48,7 @@
     <div id="review-empty" class="hidden">No cards due. Nice work.</div>
     <div id="review-session-bar" class="session-bar hidden">
       <span class="session-label">Session <span class="session-position">· card <span id="rv-position">1</span></span></span>
+      <button id="rv-back-btn" class="pill-ghost hidden">‹ Back</button>
       <span id="rv-review-count" class="review-count-pill"></span>
     </div>
     <div id="review-card-wrap" class="hidden">
@@ -89,7 +91,7 @@
       <button id="search-btn" class="pill-accent">Search</button>
     </div>
     <div class="tab-subtext">Semantic search across your deck — meaning, grammar, or romaji.</div>
-    <div id="search-results"></div>
+    <div id="search-results" class="results-list"></div>
   </section>
 
   <!-- DRILL -->
@@ -99,7 +101,7 @@
       <button id="drill-btn" class="pill-accent">Generate Drill</button>
     </div>
     <div class="tab-subtext">Fresh practice sentences built only from vocabulary you already know.</div>
-    <div id="drill-results"></div>
+    <div id="drill-results" class="results-list"></div>
   </section>
 
   <!-- CONFUSIONS -->
@@ -108,16 +110,22 @@
       <button id="confusions-btn" class="pill-accent">Find Confusions</button>
       <div class="tab-subtext">Pairs of cards you keep mixing up — similar meaning, both lapsing.</div>
     </div>
-    <div id="confusions-results"></div>
+    <div id="confusions-results" class="results-list"></div>
+  </section>
+
+  <!-- RECENT -->
+  <section id="tab-recent" class="tab-panel">
+    <div class="tab-subtext">The last cards you've graded, most recent first.</div>
+    <div id="recent-results" class="results-list"></div>
   </section>
 
   <!-- IMPORT -->
   <section id="tab-import" class="tab-panel">
     <div class="card import-card">
       <div class="card-title">Import a deck</div>
-      <div class="card-subtext">Raw Anki <code>.apkg</code> (recommended — includes audio), or CSV: <code>japanese,reading,english,tags</code></div>
+      <div class="card-subtext">Raw Anki <code>.apkg</code> — parsed directly, audio included.</div>
       <div class="dropzone">
-        <input id="import-file" type="file" accept=".apkg,.csv,.txt">
+        <input id="import-file" type="file" accept=".apkg">
         <button id="import-btn" class="pill-accent">Import</button>
       </div>
       <div id="import-result" class="result-text"></div>

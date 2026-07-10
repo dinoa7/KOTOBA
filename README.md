@@ -30,8 +30,11 @@ grammar notes.
 - **Confusions** — pure local math, zero API calls: pairwise cosine
   similarity across every card, cross-referenced with lapse counts, surfaces
   pairs you keep mixing up so they can be drilled side by side.
-- **Import** — raw Anki `.apkg` (sentence + audio extracted directly) or
-  CSV.
+- **Recent** — a chronological log of every card you've graded, most recent
+  first. Paired with a one-step "Back" button on the Review tab that undoes
+  the last grade — restoring the prior SM-2 state on the server, not just
+  the on-screen card.
+- **Import** — raw Anki `.apkg`, sentence + audio extracted directly.
 
 ## Why Cohere
 
@@ -73,21 +76,16 @@ Open http://127.0.0.1:8000 — the FastAPI app serves the frontend directly
 
 ### Import a starter deck
 
-Two supported formats, both via the Import tab or `POST /cards/import`:
+Raw Anki `.apkg`, via the Import tab or `POST /cards/import` — uploaded
+directly, no conversion step. KOTOBA parses the note's `Sentence`/`Sentence
+Meaning` fields as the card's `japanese`/`english` (not the bare vocab word —
+see "Sentence-first, not word-first" below), keeps the vocab word separately
+as `headword`, and extracts the sentence's audio clip into `data/audio/` for
+in-app playback.
 
-- **Raw Anki `.apkg`** (recommended) — uploaded directly, no conversion step.
-  KOTOBA parses the note's `Sentence`/`Sentence Meaning` fields as the card's
-  `japanese`/`english` (not the bare vocab word — see "Sentence-first, not
-  word-first" below), keeps the vocab word separately as `headword`, and
-  extracts the sentence's audio clip into `data/audio/` for in-app playback.
-  ```bash
-  curl -F "file=@my_deck.apkg" http://127.0.0.1:8000/cards/import
-  ```
-- **CSV**: `japanese,reading,english,tags[,headword,audio_path]` — the last
-  two columns are optional.
-  ```bash
-  curl -F "file=@my_deck.csv" http://127.0.0.1:8000/cards/import
-  ```
+```bash
+curl -F "file=@my_deck.apkg" http://127.0.0.1:8000/cards/import
+```
 
 ### Run tests (zero API calls)
 
@@ -142,6 +140,23 @@ breakdowns/day, ~3 drills/day, ~2 searches/day) lands around 366 calls/month.
   of history. Session-local only (an in-memory JS array, not persisted) —
   restarting the page resets it, same as Anki's learning queue
   ([frontend/app.js](frontend/app.js)).
+- **Undo by snapshot, not by inverse math.** SM-2 grading isn't cleanly
+  invertible — `repetitions`/`lapses` resets aren't reversible arithmetic —
+  so the one-step "Back" button doesn't try to compute its way back.
+  `POST /review/grade` writes the *pre-grade* row to a `review_log` table
+  before overwriting `reviews`; `POST /review/undo` just restores that
+  snapshot and deletes the log row. The same table doubles as the Recent
+  tab's activity feed ([app/routers/review.py](app/routers/review.py)).
+- **One reveal pattern, everywhere.** Search, Confusions, Recent, and Drill
+  all gate a card's reading/translation behind the same accent-colored
+  "Show Answer" control used on the Review tab, and it toggles back to
+  "Minimize" rather than committing to a one-way reveal — so browsing
+  results doesn't force every card open at once
+  ([frontend/app.js](frontend/app.js): `renderRevealBlock`).
+- **Anki `.apkg` only, no CSV.** An early CSV importer was dropped —
+  `.apkg` already carries structured fields and audio in one file, so
+  maintaining a second hand-rolled parser for a strictly worse format
+  wasn't worth it ([app/routers/cards.py](app/routers/cards.py)).
 
 ## Video demo
 https://youtu.be/C85SlkMwqmY
