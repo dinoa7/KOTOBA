@@ -29,7 +29,9 @@ grammar notes.
   the plain sentence (target word in red), its full-hiragana rendering
   (target word in black), and an English translation. Examples are cached
   per dictionary-form word so repeat requests are free, and toggle closed
-  with the same button once generated.
+  with the same button once generated. A session-local streak flame in the
+  session bar heats up through color tiers as consecutive Easy/Very Easy
+  grades accumulate — and goes out the moment anything harder is graded.
 - **Search** — semantic, not keyword: embed the query, rank locally by
   cosine similarity, rerank the top candidates. Works in Japanese or
   English, and understands typed romaji ("te" → て) without corrupting real
@@ -44,6 +46,9 @@ grammar notes.
   first. Paired with a one-step "Back" button on the Review tab that undoes
   the last grade — restoring the prior SM-2 state on the server, not just
   the on-screen card.
+- **Chart** — a hiragana/katakana gojūon reference chart (46 basic
+  characters each) with a pill slider to flip between the two scripts.
+  Fully static, zero API calls.
 - **Import** — raw Anki `.apkg`, sentence + audio extracted directly.
 
 ## Why Cohere

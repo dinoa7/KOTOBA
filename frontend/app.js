@@ -360,6 +360,7 @@ let currentCard = null;
 let sessionPosition = 1;
 let grading = false;
 let lastGraded = null;
+let gradeHistory = []; // session-local qualities, newest last — feeds the streak flame
 
 // How many other cards get shown before a just-graded card resurfaces this
 // session. This is separate from — and in addition to — the long-term SM-2
@@ -390,8 +391,39 @@ async function loadDue() {
   dueQueue = await apiFetch(`${API}/review/due`);
   sessionPosition = 1;
   lastGraded = null;
+  gradeHistory = [];
+  updateStreak(false);
   document.getElementById("rv-back-btn").classList.add("hidden");
   showCard();
+}
+
+// ---------- streak ----------
+// Consecutive Easy / Very Easy grades this session. The flame appears at 2,
+// warms through tiers as the run grows, and resets the moment anything below
+// Easy is graded. Session-local, like the requeue clock.
+function currentStreak() {
+  let n = 0;
+  for (let i = gradeHistory.length - 1; i >= 0 && gradeHistory[i] >= 4; i--) n++;
+  return n;
+}
+
+function updateStreak(grew) {
+  const el = document.getElementById("rv-streak");
+  const n = currentStreak();
+  el.classList.toggle("hidden", n < 2);
+  if (n < 2) {
+    el.classList.remove("streak-warm", "streak-hot", "streak-blaze", "streak-pop");
+    return;
+  }
+  document.getElementById("rv-streak-count").textContent = n;
+  el.classList.toggle("streak-warm", n >= 3 && n < 6);
+  el.classList.toggle("streak-hot", n >= 6 && n < 10);
+  el.classList.toggle("streak-blaze", n >= 10);
+  if (grew) {
+    el.classList.remove("streak-pop");
+    void el.offsetWidth; // restart the pop animation
+    el.classList.add("streak-pop");
+  }
 }
 
 function showCard() {
@@ -505,6 +537,8 @@ async function gradeCard(quality) {
   const insertAt = Math.min(dueQueue.length, distance);
   dueQueue.splice(insertAt, 0, gradedCard);
   sessionPosition += 1;
+  gradeHistory.push(quality);
+  updateStreak(quality >= 4);
   document.getElementById("rv-back-btn").classList.remove("hidden");
 
   setTimeout(() => {
@@ -540,6 +574,8 @@ async function goBack() {
   lastGraded.card.review_count = lastGraded.prevReviewCount;
   currentCard = lastGraded.card;
   sessionPosition = Math.max(1, sessionPosition - 1);
+  gradeHistory.pop();
+  updateStreak(false);
 
   document.getElementById("review-empty").classList.add("hidden");
   document.getElementById("review-card-wrap").classList.remove("hidden");
@@ -686,6 +722,60 @@ async function loadRecent() {
     )
     .join("") || "<p>No cards reviewed yet.</p>";
 }
+
+// ---------- kana chart ----------
+// Gojūon layout: rows are consonant groups, columns the five vowels.
+// Each cell is [hiragana, katakana, romaji]; null marks a historical gap.
+const KANA_CHART = [
+  [["あ", "ア", "a"], ["い", "イ", "i"], ["う", "ウ", "u"], ["え", "エ", "e"], ["お", "オ", "o"]],
+  [["か", "カ", "ka"], ["き", "キ", "ki"], ["く", "ク", "ku"], ["け", "ケ", "ke"], ["こ", "コ", "ko"]],
+  [["さ", "サ", "sa"], ["し", "シ", "shi"], ["す", "ス", "su"], ["せ", "セ", "se"], ["そ", "ソ", "so"]],
+  [["た", "タ", "ta"], ["ち", "チ", "chi"], ["つ", "ツ", "tsu"], ["て", "テ", "te"], ["と", "ト", "to"]],
+  [["な", "ナ", "na"], ["に", "ニ", "ni"], ["ぬ", "ヌ", "nu"], ["ね", "ネ", "ne"], ["の", "ノ", "no"]],
+  [["は", "ハ", "ha"], ["ひ", "ヒ", "hi"], ["ふ", "フ", "fu"], ["へ", "ヘ", "he"], ["ほ", "ホ", "ho"]],
+  [["ま", "マ", "ma"], ["み", "ミ", "mi"], ["む", "ム", "mu"], ["め", "メ", "me"], ["も", "モ", "mo"]],
+  [["や", "ヤ", "ya"], null, ["ゆ", "ユ", "yu"], null, ["よ", "ヨ", "yo"]],
+  [["ら", "ラ", "ra"], ["り", "リ", "ri"], ["る", "ル", "ru"], ["れ", "レ", "re"], ["ろ", "ロ", "ro"]],
+  [["わ", "ワ", "wa"], null, null, null, ["を", "ヲ", "wo"]],
+  [["ん", "ン", "n"], null, null, null, null],
+];
+
+function renderKanaChart(mode) {
+  const idx = mode === "kata" ? 1 : 0;
+  const filled = (r, c) =>
+    r >= 0 && r < KANA_CHART.length && c >= 0 && c < 5 && KANA_CHART[r][c] !== null;
+
+  // The empty slots are cut out of the chart's silhouette entirely, so each
+  // cell only draws a border where a real neighbor exists, and corners get
+  // beveled wherever the outline turns (no neighbor above AND to the side).
+  document.getElementById("kana-chart").innerHTML = KANA_CHART.map((row, r) =>
+    row
+      .map((cell, c) => {
+        if (!cell) return `<div class="kana-cell empty"></div>`;
+        const cls = ["kana-cell"];
+        if (filled(r, c + 1)) cls.push("b-r");
+        if (filled(r + 1, c)) cls.push("b-b");
+        if (!filled(r - 1, c) && !filled(r, c - 1)) cls.push("r-tl");
+        if (!filled(r - 1, c) && !filled(r, c + 1)) cls.push("r-tr");
+        if (!filled(r + 1, c) && !filled(r, c - 1)) cls.push("r-bl");
+        if (!filled(r + 1, c) && !filled(r, c + 1)) cls.push("r-br");
+        return `<div class="${cls.join(" ")}"><div class="kana">${cell[idx]}</div><div class="romaji">${cell[2]}</div></div>`;
+      })
+      .join("")
+  ).join("");
+}
+
+document.querySelectorAll(".kana-toggle-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (btn.classList.contains("active")) return;
+    document.querySelectorAll(".kana-toggle-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    btn.closest(".kana-toggle").classList.toggle("kata", btn.dataset.kana === "kata");
+    renderKanaChart(btn.dataset.kana);
+  });
+});
+
+renderKanaChart("hira");
 
 // ---------- import ----------
 document.getElementById("import-btn").addEventListener("click", async () => {

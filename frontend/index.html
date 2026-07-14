@@ -48,7 +48,15 @@
   <section id="tab-review" class="tab-panel active">
     <div id="review-empty" class="hidden">No cards due. Nice work.</div>
     <div id="review-session-bar" class="session-bar hidden">
-      <span class="session-label">Session <span class="session-position">· card <span id="rv-position">1</span></span></span>
+      <span class="session-left">
+        <span class="session-label">Session <span class="session-position">· card <span id="rv-position">1</span></span></span>
+        <span id="rv-streak" class="streak hidden" title="Easy streak">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true">
+            <path d="M13.2 1.5c.3-.6 1.2-.5 1.4.1.8 2.6 2.2 4.2 3.5 5.8 1.5 1.8 2.9 3.7 2.9 7 0 4.9-3.6 8.1-9 8.1s-9-3.2-9-8.1c0-3 1.5-5.4 3-7.2.4-.5 1.3-.2 1.3.5 0 1.1.9 2 2 1.9 1-.1 1.7-.9 1.8-1.9.1-2.1-.4-4 2.1-6.2z"/>
+          </svg>
+          <span id="rv-streak-count"></span>
+        </span>
+      </span>
       <button id="rv-back-btn" class="pill-ghost hidden">‹ Back</button>
       <span id="rv-review-count" class="review-count-pill"></span>
     </div>

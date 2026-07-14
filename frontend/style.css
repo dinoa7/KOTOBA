@@ -204,12 +204,48 @@ main {
   gap: 8px;
 }
 .session-label { font-weight: 700; }
+.session-left { display: inline-flex; align-items: center; gap: 10px; }
 .session-position { color: var(--muted-3); font-weight: 500; }
 .review-count-pill {
   background: var(--panel-2);
   padding: 4px 12px;
   border-radius: 999px;
   font-size: 13px;
+}
+
+/* ---------- easy-streak flame ---------- */
+/* Heats up with consecutive Easy/Very Easy grades: ember (2+) -> warm (3+)
+   -> hot (6+, gentle flicker) -> blazing (10+, livelier flicker). Kept
+   deliberately subtle — small, palette colors, low-amplitude motion. */
+.streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted-4);
+  transition: color 400ms;
+}
+.streak svg { display: block; }
+.streak.streak-warm { color: var(--grade-2); }
+.streak.streak-hot { color: var(--accent); }
+.streak.streak-blaze { color: var(--accent-dark); }
+
+.streak-hot svg { animation: flicker 1.8s ease-in-out infinite; }
+.streak-blaze svg { animation: flicker 1.1s ease-in-out infinite; }
+@keyframes flicker {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  30% { transform: scale(1.06) rotate(-2deg); opacity: 0.9; }
+  60% { transform: scale(0.97) rotate(2deg); opacity: 1; }
+}
+
+.streak.streak-pop svg { animation: streak-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.streak-hot.streak-pop svg,
+.streak-blaze.streak-pop svg { animation: streak-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1), flicker 1.4s ease-in-out 260ms infinite; }
+@keyframes streak-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.35); }
+  100% { transform: scale(1); }
 }
 
 #review-card-wrap { display: flex; justify-content: center; }
@@ -503,6 +539,69 @@ td:nth-child(4), td:nth-child(6) { color: var(--muted); }
 .drill-body { margin-top: 14px; }
 .drill-body .jp-text { font-size: 24px; }
 .drill-toggle-wrap { margin-top: 12px; }
+
+/* ---------- kana chart ---------- */
+.kana-toggle {
+  position: relative;
+  display: flex;
+  width: min(340px, 100%);
+  margin: 0 auto;
+  background: var(--panel-2);
+  border-radius: 999px;
+  padding: 4px;
+}
+.kana-toggle-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  background: var(--accent);
+  border-radius: 999px;
+  transition: transform 220ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+.kana-toggle.kata .kana-toggle-thumb { transform: translateX(100%); }
+.kana-toggle-btn {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  border: none;
+  padding: 10px 0;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--muted);
+  transition: color 220ms;
+}
+.kana-toggle-btn.active { color: var(--bg); }
+
+/* One connected chart whose silhouette excludes the empty slots: the grid
+   itself has no background — each filled cell paints its own panel, empty
+   cells stay transparent, and drop-shadow() (unlike box-shadow) follows the
+   resulting custom shape. Borders/bevels come from neighbor-aware classes
+   set in renderKanaChart(). */
+.kana-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  width: 100%;
+  max-width: 560px;
+  margin: 24px auto 0;
+  filter: drop-shadow(0 2px 4px rgba(42, 36, 29, 0.07)) drop-shadow(0 10px 18px rgba(42, 36, 29, 0.08));
+}
+.kana-cell {
+  background: var(--panel);
+  padding: 14px 0 12px;
+  text-align: center;
+}
+.kana-cell.b-r { border-right: 1px solid var(--border-soft); }
+.kana-cell.b-b { border-bottom: 1px solid var(--border-soft); }
+.kana-cell.r-tl { border-top-left-radius: 16px; }
+.kana-cell.r-tr { border-top-right-radius: 16px; }
+.kana-cell.r-bl { border-bottom-left-radius: 16px; }
+.kana-cell.r-br { border-bottom-right-radius: 16px; }
+.kana-cell.empty { background: transparent; border: none; }
+.kana-cell .kana { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.kana-cell .romaji { font-size: 12px; color: var(--muted-2); margin-top: 2px; }
 
 /* ---------- import ---------- */
 .import-card {
