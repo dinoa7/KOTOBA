@@ -17,6 +17,9 @@ def _rows(n, prefix="row"):
             "english": f"english{i}",
             "tags": "",
             "headword": "",
+            "word_reading": "",
+            "word_meaning": "",
+            "highlight": None,
             "audio_path": None,
         }
         for i in range(n)

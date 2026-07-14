@@ -18,8 +18,12 @@ grammar notes.
 
 ## Features
 
-- **Review** — SM-2 spaced repetition, entirely offline. A "Breakdown"
-  button on any card hits the (usually cached) breakdown endpoint.
+- **Review** — SM-2 spaced repetition, entirely offline, laid out the way
+  Anki decks render: the card front shows the sentence with its target word
+  colored (using the deck's own highlight markup), and the back reveals the
+  word's own reading and definition first, then the sentence furigana and
+  translation. A "Breakdown" button on any card hits the (usually cached)
+  breakdown endpoint.
 - **Search** — semantic, not keyword: embed the query, rank locally by
   cosine similarity, rerank the top candidates. Works in Japanese or
   English, and understands typed romaji ("te" → て) without corrupting real
@@ -80,8 +84,13 @@ Raw Anki `.apkg`, via the Import tab or `POST /cards/import` — uploaded
 directly, no conversion step. KOTOBA parses the note's `Sentence`/`Sentence
 Meaning` fields as the card's `japanese`/`english` (not the bare vocab word —
 see "Sentence-first, not word-first" below), keeps the vocab word separately
-as `headword`, and extracts the sentence's audio clip into `data/audio/` for
-in-app playback.
+as `headword` along with its `Word Reading`/`Word Meaning` fields and the
+deck's own bold markup marking the target word inside the sentence, and
+extracts the sentence's audio clip into `data/audio/` for in-app playback.
+Duplicates are keyed on (sentence, meaning, headword) — sentence-per-word
+decks legitimately reuse one sentence for several target words. Re-importing
+a deck backfills word fields onto existing cards without new embed calls or
+touching SRS state.
 
 ```bash
 curl -F "file=@my_deck.apkg" http://127.0.0.1:8000/cards/import
@@ -157,6 +166,16 @@ breakdowns/day, ~3 drills/day, ~2 searches/day) lands around 366 calls/month.
   `.apkg` already carries structured fields and audio in one file, so
   maintaining a second hand-rolled parser for a strictly worse format
   wasn't worth it ([app/routers/cards.py](app/routers/cards.py)).
+- **The deck's own markup is the highlight source, not substring matching.**
+  Anki renders note fields as raw HTML, so sentence-per-word decks mark the
+  target word by bolding it inside the Sentence field
+  (`あの<b>人</b>はいい人です。`). That markup is the only reliable signal for
+  *which occurrence* is the target — 人 appears twice in that sentence, and
+  the deck also bolds conjugated surface forms (聞いて) that dictionary-form
+  headword matching (聞く) would miss. Import preserves it in a `highlight`
+  column; plain-text `japanese` stays the source for embeddings, prompts,
+  and dedup ([app/anki_import.py](app/anki_import.py)). Headword substring
+  matching survives only as a display fallback for cards without markup.
 
 ## Video demo
 https://youtu.be/C85SlkMwqmY

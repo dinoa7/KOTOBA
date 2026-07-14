@@ -11,6 +11,9 @@ CREATE TABLE IF NOT EXISTS cards (
     english TEXT NOT NULL,
     tags TEXT DEFAULT '',
     headword TEXT DEFAULT '',      -- the single vocab word this sentence drills; feeds drill's known-vocab list
+    word_reading TEXT DEFAULT '',  -- the headword's own reading (かれ for 彼), from the note's Word Reading field
+    word_meaning TEXT DEFAULT '',  -- the headword's own definition, from the note's Word Meaning field
+    highlight TEXT,                -- sentence with the deck's <b></b> kept around the target-word occurrence
     audio_path TEXT,               -- filename under data/audio/, served at /audio/<audio_path>
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
@@ -59,6 +62,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE cards ADD COLUMN headword TEXT DEFAULT ''")
     if "audio_path" not in existing_cards:
         conn.execute("ALTER TABLE cards ADD COLUMN audio_path TEXT")
+    if "word_reading" not in existing_cards:
+        conn.execute("ALTER TABLE cards ADD COLUMN word_reading TEXT DEFAULT ''")
+    if "word_meaning" not in existing_cards:
+        conn.execute("ALTER TABLE cards ADD COLUMN word_meaning TEXT DEFAULT ''")
+    if "highlight" not in existing_cards:
+        conn.execute("ALTER TABLE cards ADD COLUMN highlight TEXT")
 
     existing_reviews = {row["name"] for row in conn.execute("PRAGMA table_info(reviews)")}
     if "total_reviews" not in existing_reviews:

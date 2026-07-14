@@ -7,6 +7,9 @@ class CardIn(BaseModel):
     english: str
     tags: str = ""
     headword: str = ""
+    word_reading: str = ""
+    word_meaning: str = ""
+    highlight: str | None = None
     audio_path: str | None = None
 
 
@@ -25,6 +28,9 @@ class CardOut(CardIn):
             english=row["english"],
             tags=row["tags"],
             headword=row["headword"] or "",
+            word_reading=(row["word_reading"] if "word_reading" in row_keys else "") or "",
+            word_meaning=(row["word_meaning"] if "word_meaning" in row_keys else "") or "",
+            highlight=row["highlight"] if "highlight" in row_keys else None,
             audio_path=row["audio_path"],
             created_at=row["created_at"],
             review_count=row["review_count"] if "review_count" in row_keys else 0,

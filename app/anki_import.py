@@ -21,6 +21,8 @@ from pathlib import Path
 CJK_RE = re.compile(r"[぀-ヿ一-鿿]")
 HTML_TAG_RE = re.compile(r"<[^>]+>")
 SOUND_REF_RE = re.compile(r"\[sound:([^\]]+)\]")
+BOLD_OPEN_RE = re.compile(r"<(?:b|strong)>", re.IGNORECASE)
+BOLD_CLOSE_RE = re.compile(r"</(?:b|strong)>", re.IGNORECASE)
 
 
 @dataclass
@@ -29,6 +31,9 @@ class ParsedNote:
     reading: str
     english: str
     headword: str
+    word_reading: str
+    word_meaning: str
+    highlight: str | None
     audio_path: str | None
 
 
@@ -36,6 +41,24 @@ def _clean_text(text: str) -> str:
     text = SOUND_REF_RE.sub("", text)
     text = HTML_TAG_RE.sub("", text)
     return text.strip()
+
+
+def _extract_highlight(sentence_raw: str) -> str | None:
+    """Preserve the deck's own target-word markup, stripping everything else.
+
+    Anki renders note fields as raw HTML, so decks mark the target word by
+    bolding it inside the Sentence field (あの<b>人</b>はいい人です。). That
+    markup is the only reliable indicator of WHICH occurrence is the target —
+    substring-matching the headword can't tell 人 from 人 in the example
+    above — so keep it, normalized to literal <b></b> around the target.
+    """
+    text = SOUND_REF_RE.sub("", sentence_raw)
+    text = BOLD_OPEN_RE.sub("\x00", text)
+    text = BOLD_CLOSE_RE.sub("\x01", text)
+    text = HTML_TAG_RE.sub("", text).strip()
+    if "\x00" not in text or "\x01" not in text:
+        return None
+    return text.replace("\x00", "<b>").replace("\x01", "</b>")
 
 
 def _extract_sound_filename(text: str) -> str | None:
@@ -112,6 +135,9 @@ def parse_apkg(apkg_path: Path, audio_out_dir: Path) -> list[ParsedNote]:
                     _field(parts, layout["word_meaning"])
                 )
                 reading = _clean_text(_field(parts, layout["sentence_furigana"]))
+                word_reading = _clean_text(_field(parts, layout["word_reading"]))
+                word_meaning = _clean_text(_field(parts, layout["word_meaning"]))
+                highlight = _extract_highlight(sentence_raw) if sentence else None
 
                 audio_path = None
                 sound_field = _field(parts, layout["sentence_audio"])
@@ -130,6 +156,9 @@ def parse_apkg(apkg_path: Path, audio_out_dir: Path) -> list[ParsedNote]:
                         reading=reading,
                         english=english,
                         headword=headword,
+                        word_reading=word_reading,
+                        word_meaning=word_meaning,
+                        highlight=highlight,
                         audio_path=audio_path,
                     )
                 )

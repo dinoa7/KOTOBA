@@ -32,9 +32,20 @@ def list_cards():
 def create_card(card: CardIn):
     with get_conn() as conn:
         cur = conn.execute(
-            "INSERT INTO cards (japanese, reading, english, tags, headword, audio_path) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (card.japanese, card.reading, card.english, card.tags, card.headword, card.audio_path),
+            "INSERT INTO cards (japanese, reading, english, tags, headword, "
+            "word_reading, word_meaning, highlight, audio_path) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                card.japanese,
+                card.reading,
+                card.english,
+                card.tags,
+                card.headword,
+                card.word_reading,
+                card.word_meaning,
+                card.highlight,
+                card.audio_path,
+            ),
         )
         card_id = cur.lastrowid
         conn.execute(
@@ -72,6 +83,9 @@ def _parse_apkg_rows(raw_bytes: bytes, deck_tag: str) -> list[dict]:
             "english": n.english,
             "tags": deck_tag,
             "headword": n.headword,
+            "word_reading": n.word_reading,
+            "word_meaning": n.word_meaning,
+            "highlight": n.highlight,
             "audio_path": n.audio_path,
         }
         for n in notes
@@ -83,9 +97,20 @@ def _insert_batch(rows: list[dict]) -> list[int]:
         ids = []
         for r in rows:
             cur = conn.execute(
-                "INSERT INTO cards (japanese, reading, english, tags, headword, audio_path) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (r["japanese"], r["reading"], r["english"], r["tags"], r["headword"], r["audio_path"]),
+                "INSERT INTO cards (japanese, reading, english, tags, headword, "
+                "word_reading, word_meaning, highlight, audio_path) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    r["japanese"],
+                    r["reading"],
+                    r["english"],
+                    r["tags"],
+                    r["headword"],
+                    r["word_reading"],
+                    r["word_meaning"],
+                    r["highlight"],
+                    r["audio_path"],
+                ),
             )
             ids.append(cur.lastrowid)
             conn.execute(
@@ -156,13 +181,41 @@ async def import_cards(file: UploadFile):
     deck_tag = Path(filename).stem.lower().replace(" ", "-")
     parsed = _parse_apkg_rows(raw, deck_tag)
 
+    # Dedup by (sentence, meaning, headword), not just (sentence, meaning):
+    # sentence-per-word decks reuse one sentence for several target words
+    # (あの<b>人</b>はいい人です vs あの人は<b>いい</b>人です), and those are
+    # distinct cards, not duplicates.
     with get_conn() as conn:
         existing = {
-            (r["japanese"], r["english"])
-            for r in conn.execute("SELECT japanese, english FROM cards").fetchall()
+            (r["japanese"], r["english"], r["headword"] or ""): dict(r)
+            for r in conn.execute(
+                "SELECT id, japanese, english, headword, word_reading, word_meaning, highlight FROM cards"
+            ).fetchall()
         }
 
-    new_rows = [r for r in parsed if (r["japanese"], r["english"]) not in existing]
+    new_rows = []
+    backfill = []
+    for r in parsed:
+        match = existing.get((r["japanese"], r["english"], r["headword"]))
+        if match is None:
+            new_rows.append(r)
+        elif (
+            (r["word_reading"] and not match["word_reading"])
+            or (r["word_meaning"] and not match["word_meaning"])
+            or (r["highlight"] and not match["highlight"])
+        ):
+            backfill.append((r, match["id"]))
     skipped = len(parsed) - len(new_rows)
+
+    # Cards imported before word fields existed get them filled in on
+    # re-import — an UPDATE only, so it costs zero embed calls and never
+    # touches SRS state.
+    if backfill:
+        with get_conn() as conn:
+            for r, card_id in backfill:
+                conn.execute(
+                    "UPDATE cards SET word_reading = ?, word_meaning = ?, highlight = ? WHERE id = ?",
+                    (r["word_reading"], r["word_meaning"], r["highlight"], card_id),
+                )
 
     return await _do_import(new_rows, skipped)

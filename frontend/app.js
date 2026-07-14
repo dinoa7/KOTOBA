@@ -177,6 +177,41 @@ function escapeAttr(str) {
   return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 }
 
+function escapeHtml(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Render a card's sentence with the target word colored. Prefers the deck's
+// own <b></b> markup (preserved at import as `highlight`) — it marks WHICH
+// occurrence is the target, which substring matching can't (人 appears twice
+// in あの人はいい人です。). Falls back to first-occurrence headword match for
+// cards imported before highlights were stored.
+function renderJapanese(card) {
+  if (card.highlight && card.highlight.includes("<b>")) {
+    return card.highlight
+      .split(/(<b>|<\/b>)/)
+      .map((part) =>
+        part === "<b>" ? '<span class="hl-word">' : part === "</b>" ? "</span>" : escapeHtml(part)
+      )
+      .join("");
+  }
+  const jp = escapeHtml(card.japanese);
+  const hw = card.headword ? escapeHtml(card.headword) : "";
+  if (hw && jp.includes(hw)) return jp.replace(hw, `<span class="hl-word">${hw}</span>`);
+  return jp;
+}
+
+// The target word's own definition line (Anki-style back: word → reading →
+// meaning), shown above the sentence translation once the answer is revealed.
+function renderWordDef(card) {
+  if (!card.word_meaning) return "";
+  const reading =
+    card.word_reading && card.word_reading !== card.headword
+      ? `<span class="word-def-reading">${escapeHtml(card.word_reading)}</span>`
+      : "";
+  return `<span class="word-def-word">${escapeHtml(card.headword)}</span>${reading}<span class="word-def-meaning">${escapeHtml(card.word_meaning)}</span>`;
+}
+
 let breakdownSlotCounter = 0;
 
 function renderBreakdownButton(japanese) {
@@ -189,8 +224,10 @@ function renderBreakdownButton(japanese) {
 // Answer button, used everywhere a card's Japanese is shown up front —
 // mirrors the Review tab's reveal flow instead of exposing the answer immediately.
 function renderRevealBlock(card) {
+  const wordDef = renderWordDef(card);
   return `<button class="pill-accent show-answer-btn">Show Answer</button>
     <div class="result-reveal hidden">
+      ${wordDef ? `<div class="word-def">${wordDef}</div>` : ""}
       ${card.reading ? `<div class="reading-pill">${card.reading}</div>` : ""}
       <div class="english">${card.english}</div>
       ${renderBreakdownButton(card.japanese)}
@@ -306,7 +343,12 @@ function showCard() {
 
 function populateCardDOM(card) {
   document.getElementById("rv-position").textContent = sessionPosition;
-  document.getElementById("rv-japanese").textContent = card.japanese;
+  document.getElementById("rv-japanese").innerHTML = renderJapanese(card);
+
+  const wordDefEl = document.getElementById("rv-word-def");
+  const wordDef = renderWordDef(card);
+  wordDefEl.innerHTML = wordDef;
+  wordDefEl.classList.toggle("hidden", !wordDef);
 
   const audioEl = document.getElementById("rv-audio-el");
   const playBtn = document.getElementById("rv-play-audio");
@@ -455,7 +497,7 @@ document.getElementById("search-btn").addEventListener("click", async () => {
       .map(
         (r) => `<div class="result-item">
           <span class="score">${r.score.toFixed(3)}</span>
-          <div class="jp-text">${r.card.japanese}</div>
+          <div class="jp-text">${renderJapanese(r.card)}</div>
           ${renderAudio(r.card.audio_path)}
           ${renderRevealBlock(r.card)}
         </div>`
@@ -517,10 +559,10 @@ document.getElementById("confusions-btn").addEventListener("click", async () => 
     .map(
       (p) => `<div class="result-item">
         <span class="score">sim ${p.similarity.toFixed(3)} · ${p.combined_lapses} lapses</span>
-        <div class="jp-text">${p.card_a.japanese}</div>
+        <div class="jp-text">${renderJapanese(p.card_a)}</div>
         ${renderRevealBlock(p.card_a)}
         <div class="confusion-vs"><div class="line"></div><span>VS</span><div class="line"></div></div>
-        <div class="jp-text">${p.card_b.japanese}</div>
+        <div class="jp-text">${renderJapanese(p.card_b)}</div>
         ${renderRevealBlock(p.card_b)}
       </div>`
     )
@@ -550,7 +592,7 @@ async function loadRecent() {
     .map(
       (entry) => `<div class="result-item">
         <span class="score quality-badge" data-q="${entry.quality}">${QUALITY_LABELS[entry.quality] || entry.quality} · ${relativeTime(entry.graded_at)}</span>
-        <div class="jp-text">${entry.card.japanese}</div>
+        <div class="jp-text">${renderJapanese(entry.card)}</div>
         ${renderAudio(entry.card.audio_path)}
         ${renderRevealBlock(entry.card)}
       </div>`

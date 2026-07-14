@@ -232,6 +232,24 @@ main {
 
 .jp-text { font-size: 42px; font-weight: 700; color: var(--text); line-height: 1.5; }
 
+/* The card's target word, colored inside the sentence (from the deck's own
+   <b> markup, Anki-style). */
+.hl-word { color: var(--accent); }
+
+/* Anki-style word definition line revealed with the answer:
+   word → reading → meaning. */
+.word-def {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.word-def-word { color: var(--accent); font-weight: 700; font-size: 24px; }
+.word-def-reading { color: var(--muted-2); font-size: 15px; }
+.word-def-meaning { font-size: 16px; }
+
 .audio-row { margin-top: 18px; }
 
 .reading-pill {
