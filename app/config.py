@@ -16,6 +16,9 @@ PROMPTS_DIR = BASE_DIR / "prompts"
 AUDIO_DIR = DATA_DIR / "audio"
 AUDIO_DIR.mkdir(exist_ok=True, parents=True)
 
+IMAGES_DIR = DATA_DIR / "images"
+IMAGES_DIR.mkdir(exist_ok=True, parents=True)
+
 COHERE_API_KEY = os.getenv("COHERE_API_KEY", "")
 MOCK = os.getenv("MOCK", "0") == "1"
 

@@ -25,6 +25,7 @@
     <button data-tab="drill" class="tab-btn">Drill</button>
     <button data-tab="confusions" class="tab-btn">Confusions</button>
     <button data-tab="recent" class="tab-btn">Recent</button>
+    <button data-tab="chart" class="tab-btn">Chart</button>
     <button data-tab="import" class="tab-btn">Import</button>
   </nav>
   <div class="volume-control">
@@ -59,6 +60,7 @@
           <audio id="rv-audio-el" preload="none"></audio>
         </div>
         <div id="rv-reveal" class="hidden">
+          <img id="rv-word-image" class="word-image hidden" alt="">
           <div id="rv-word-def" class="word-def hidden"></div>
           <div class="reading-pill" id="rv-reading"></div>
           <div class="english" id="rv-english"></div>
@@ -118,6 +120,16 @@
   <section id="tab-recent" class="tab-panel">
     <div class="tab-subtext">The last cards you've graded, most recent first.</div>
     <div id="recent-results" class="results-list"></div>
+  </section>
+
+  <!-- CHART -->
+  <section id="tab-chart" class="tab-panel">
+    <div class="kana-toggle">
+      <div class="kana-toggle-thumb"></div>
+      <button class="kana-toggle-btn active" data-kana="hira">ひらがな Hiragana</button>
+      <button class="kana-toggle-btn" data-kana="kata">カタカナ Katakana</button>
+    </div>
+    <div id="kana-chart" class="kana-grid"></div>
   </section>
 
   <!-- IMPORT -->

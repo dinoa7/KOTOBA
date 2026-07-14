@@ -23,6 +23,7 @@ HTML_TAG_RE = re.compile(r"<[^>]+>")
 SOUND_REF_RE = re.compile(r"\[sound:([^\]]+)\]")
 BOLD_OPEN_RE = re.compile(r"<(?:b|strong)>", re.IGNORECASE)
 BOLD_CLOSE_RE = re.compile(r"</(?:b|strong)>", re.IGNORECASE)
+IMG_SRC_RE = re.compile(r"<img[^>]+src=[\"']([^\"']+)[\"']", re.IGNORECASE)
 
 
 @dataclass
@@ -35,6 +36,7 @@ class ParsedNote:
     word_meaning: str
     highlight: str | None
     audio_path: str | None
+    image_path: str | None
 
 
 def _clean_text(text: str) -> str:
@@ -66,6 +68,11 @@ def _extract_sound_filename(text: str) -> str | None:
     return match.group(1) if match else None
 
 
+def _extract_image_filename(text: str) -> str | None:
+    match = IMG_SRC_RE.search(text)
+    return match.group(1) if match else None
+
+
 def _field_index(field_names: list[str], *candidates: str) -> int | None:
     lowered = [f.lower() for f in field_names]
     for cand in candidates:
@@ -80,8 +87,10 @@ def _field(parts: list[str], idx: int | None) -> str:
     return parts[idx]
 
 
-def parse_apkg(apkg_path: Path, audio_out_dir: Path) -> list[ParsedNote]:
+def parse_apkg(apkg_path: Path, audio_out_dir: Path, images_out_dir: Path | None = None) -> list[ParsedNote]:
     audio_out_dir.mkdir(parents=True, exist_ok=True)
+    if images_out_dir is not None:
+        images_out_dir.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(apkg_path) as z:
         media_map = json.loads(z.read("media"))
@@ -106,6 +115,7 @@ def parse_apkg(apkg_path: Path, audio_out_dir: Path) -> list[ParsedNote]:
                     "sentence_meaning": _field_index(names, "Sentence Meaning"),
                     "sentence_furigana": _field_index(names, "Sentence Furigana"),
                     "sentence_audio": _field_index(names, "Sentence Audio"),
+                    "picture": _field_index(names, "Picture", "Image"),
                 }
 
             cur.execute("SELECT id, mid, flds FROM notes")
@@ -150,6 +160,18 @@ def parse_apkg(apkg_path: Path, audio_out_dir: Path) -> list[ParsedNote]:
                         shutil.copyfileobj(src, dst)
                     audio_path = out_name
 
+                image_path = None
+                if images_out_dir is not None:
+                    picture_field = _field(parts, layout["picture"])
+                    image_filename = _extract_image_filename(picture_field)
+                    if image_filename and image_filename in filename_to_member:
+                        member_name = filename_to_member[image_filename]
+                        ext = Path(image_filename).suffix or ".jpg"
+                        out_name = f"{note_id}{ext}"
+                        with z.open(member_name) as src, open(images_out_dir / out_name, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+                        image_path = out_name
+
                 parsed.append(
                     ParsedNote(
                         japanese=japanese,
@@ -160,6 +182,7 @@ def parse_apkg(apkg_path: Path, audio_out_dir: Path) -> list[ParsedNote]:
                         word_meaning=word_meaning,
                         highlight=highlight,
                         audio_path=audio_path,
+                        image_path=image_path,
                     )
                 )
 

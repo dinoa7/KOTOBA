@@ -8,7 +8,7 @@ import sqlite3
 import zipfile
 
 MODEL_ID = "1"
-FIELD_NAMES = ["Word", "Word Reading", "Word Meaning", "Sentence", "Sentence Meaning", "Sentence Audio"]
+FIELD_NAMES = ["Word", "Word Reading", "Word Meaning", "Sentence", "Sentence Meaning", "Sentence Audio", "Picture"]
 
 
 def _build_collection_bytes(notes: list[dict]) -> bytes:
@@ -32,6 +32,7 @@ def _build_collection_bytes(notes: list[dict]) -> bytes:
                 n.get("sentence", ""),
                 n.get("sentence_meaning", ""),
                 n.get("sentence_audio", ""),
+                n.get("picture", ""),
             ]
         )
         conn.execute("INSERT INTO notes (id, mid, flds) VALUES (?, ?, ?)", (1000 + i, MODEL_ID, flds))

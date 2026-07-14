@@ -21,6 +21,7 @@ def _rows(n, prefix="row"):
             "word_meaning": "",
             "highlight": None,
             "audio_path": None,
+            "image_path": None,
         }
         for i in range(n)
     ]

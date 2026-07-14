@@ -201,15 +201,17 @@ function renderJapanese(card) {
   return jp;
 }
 
-// The target word's own definition line (Anki-style back: word → reading →
-// meaning), shown above the sentence translation once the answer is revealed.
+// The target word's definition line, shown above the sentence translation
+// once the answer is revealed. The word itself isn't repeated — it's already
+// highlighted in the sentence — so this is just its hiragana reading (when
+// that adds information beyond the word itself) plus the meaning.
 function renderWordDef(card) {
   if (!card.word_meaning) return "";
   const reading =
     card.word_reading && card.word_reading !== card.headword
       ? `<span class="word-def-reading">${escapeHtml(card.word_reading)}</span>`
       : "";
-  return `<span class="word-def-word">${escapeHtml(card.headword)}</span>${reading}<span class="word-def-meaning">${escapeHtml(card.word_meaning)}</span>`;
+  return `${reading}<span class="word-def-meaning">${escapeHtml(card.word_meaning)}</span>`;
 }
 
 let breakdownSlotCounter = 0;
@@ -225,8 +227,12 @@ function renderBreakdownButton(japanese) {
 // mirrors the Review tab's reveal flow instead of exposing the answer immediately.
 function renderRevealBlock(card) {
   const wordDef = renderWordDef(card);
+  const image = card.image_path
+    ? `<img class="word-image" src="/images/${encodeURIComponent(card.image_path)}" alt="" loading="lazy">`
+    : "";
   return `<button class="pill-accent show-answer-btn">Show Answer</button>
     <div class="result-reveal hidden">
+      ${image}
       ${wordDef ? `<div class="word-def">${wordDef}</div>` : ""}
       ${card.reading ? `<div class="reading-pill">${card.reading}</div>` : ""}
       <div class="english">${card.english}</div>
@@ -263,18 +269,90 @@ document.addEventListener("click", async (e) => {
 
 function renderBreakdownTable(breakdown) {
   const rows = breakdown
-    .map(
-      (t) => `<tr>
+    .map((t) => {
+      const word = t.dictionary_form || t.token;
+      const isPunct = (t.part_of_speech || "").toLowerCase().includes("punct");
+      const exampleBtn = isPunct
+        ? ""
+        : `<button class="example-btn" data-word="${escapeAttr(word)}" data-reading="${escapeAttr(t.reading || "")}">Example</button>`;
+      return `<tr>
         <td>${t.token}</td><td>${t.reading}</td><td>${t.dictionary_form}</td>
         <td>${t.part_of_speech}</td><td>${t.meaning}</td><td>${t.grammar_note}</td>
-      </tr>`
-    )
+        <td>${exampleBtn}</td>
+      </tr>`;
+    })
     .join("");
   return `<table>
-    <thead><tr><th>Token</th><th>Reading</th><th>Dict. form</th><th>POS</th><th>Meaning</th><th>Note</th></tr></thead>
+    <thead><tr><th>Token</th><th>Reading</th><th>Dict. form</th><th>POS</th><th>Meaning</th><th>Note</th><th></th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
+
+// Wrap the target word inside an example sentence. The sentence usually
+// contains an inflected surface form (食べます for 食べる), so fall back to
+// progressively shorter prefixes of the target — a kanji stem may match down
+// to a single character, but a pure-kana prefix must keep at least two so a
+// lone kana can't false-match a particle.
+const KANJI_RE = /[一-鿿]/;
+
+function highlightIn(sentence, target, className) {
+  const esc = escapeHtml(sentence);
+  if (!target) return esc;
+  for (let len = target.length; len >= 1; len--) {
+    const prefix = target.slice(0, len);
+    if (len < (KANJI_RE.test(prefix) ? 1 : 2)) break;
+    const escPrefix = escapeHtml(prefix);
+    if (esc.includes(escPrefix)) {
+      return esc.replace(escPrefix, `<span class="${className}">${escPrefix}</span>`);
+    }
+  }
+  return esc;
+}
+
+// "Example" button on a breakdown row: generate (or fetch from cache) one
+// example sentence for that token and insert it as a full-width row directly
+// beneath — pure sentence, hiragana rendering, then the English translation.
+// Once generated, the button toggles the row: Example <-> Minimize.
+document.addEventListener("click", async (e) => {
+  if (!e.target.classList.contains("example-btn")) return;
+  const btn = e.target;
+  const tokenRow = btn.closest("tr");
+
+  const existingRow = tokenRow.nextElementSibling;
+  if (existingRow && existingRow.classList.contains("example-row")) {
+    const nowHidden = existingRow.classList.toggle("hidden");
+    btn.textContent = nowHidden ? "Example" : "Minimize";
+    return;
+  }
+
+  const word = btn.dataset.word;
+  const reading = btn.dataset.reading || "";
+  btn.disabled = true;
+  btn.textContent = "...";
+  try {
+    const ex = await apiFetch(`${API}/example`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ word }),
+    });
+    const exampleRow = document.createElement("tr");
+    exampleRow.className = "example-row";
+    exampleRow.innerHTML = `<td colspan="7">
+      <div class="ex-jp">${highlightIn(ex.japanese, word, "hl-word")}</div>
+      <div class="ex-hira">${highlightIn(ex.hiragana, reading || word, "ex-hl-dark")}</div>
+      <div class="ex-en">${escapeHtml(ex.english)}</div>
+    </td>`;
+    tokenRow.after(exampleRow);
+    btn.disabled = false;
+    btn.textContent = "Minimize";
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = "offline";
+    setTimeout(() => {
+      btn.textContent = "Example";
+    }, 2000);
+  }
+});
 
 // ---------- review ----------
 let dueQueue = [];
@@ -344,6 +422,15 @@ function showCard() {
 function populateCardDOM(card) {
   document.getElementById("rv-position").textContent = sessionPosition;
   document.getElementById("rv-japanese").innerHTML = renderJapanese(card);
+
+  const imageEl = document.getElementById("rv-word-image");
+  if (card.image_path) {
+    imageEl.src = `/images/${encodeURIComponent(card.image_path)}`;
+    imageEl.classList.remove("hidden");
+  } else {
+    imageEl.removeAttribute("src");
+    imageEl.classList.add("hidden");
+  }
 
   const wordDefEl = document.getElementById("rv-word-def");
   const wordDef = renderWordDef(card);

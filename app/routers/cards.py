@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile
 
 from app import anki_import
-from app.config import AUDIO_DIR, EMBED_BATCH_SIZE, MOCK
+from app.config import AUDIO_DIR, EMBED_BATCH_SIZE, IMAGES_DIR, MOCK
 from app.cohere_client import embed
 from app.db import get_conn
 from app.models import CardIn, CardOut, ImportResult
@@ -75,7 +75,7 @@ def delete_card(card_id: int):
 
 
 def _parse_apkg_rows(raw_bytes: bytes, deck_tag: str) -> list[dict]:
-    notes = anki_import.parse_apkg(io.BytesIO(raw_bytes), AUDIO_DIR)
+    notes = anki_import.parse_apkg(io.BytesIO(raw_bytes), AUDIO_DIR, IMAGES_DIR)
     return [
         {
             "japanese": n.japanese,
@@ -87,6 +87,7 @@ def _parse_apkg_rows(raw_bytes: bytes, deck_tag: str) -> list[dict]:
             "word_meaning": n.word_meaning,
             "highlight": n.highlight,
             "audio_path": n.audio_path,
+            "image_path": n.image_path,
         }
         for n in notes
     ]
@@ -98,8 +99,8 @@ def _insert_batch(rows: list[dict]) -> list[int]:
         for r in rows:
             cur = conn.execute(
                 "INSERT INTO cards (japanese, reading, english, tags, headword, "
-                "word_reading, word_meaning, highlight, audio_path) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "word_reading, word_meaning, highlight, audio_path, image_path) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     r["japanese"],
                     r["reading"],
@@ -110,6 +111,7 @@ def _insert_batch(rows: list[dict]) -> list[int]:
                     r["word_meaning"],
                     r["highlight"],
                     r["audio_path"],
+                    r["image_path"],
                 ),
             )
             ids.append(cur.lastrowid)
@@ -189,7 +191,7 @@ async def import_cards(file: UploadFile):
         existing = {
             (r["japanese"], r["english"], r["headword"] or ""): dict(r)
             for r in conn.execute(
-                "SELECT id, japanese, english, headword, word_reading, word_meaning, highlight FROM cards"
+                "SELECT id, japanese, english, headword, word_reading, word_meaning, highlight, image_path FROM cards"
             ).fetchall()
         }
 
@@ -203,19 +205,20 @@ async def import_cards(file: UploadFile):
             (r["word_reading"] and not match["word_reading"])
             or (r["word_meaning"] and not match["word_meaning"])
             or (r["highlight"] and not match["highlight"])
+            or (r["image_path"] and not match["image_path"])
         ):
             backfill.append((r, match["id"]))
     skipped = len(parsed) - len(new_rows)
 
-    # Cards imported before word fields existed get them filled in on
+    # Cards imported before word/image fields existed get them filled in on
     # re-import — an UPDATE only, so it costs zero embed calls and never
     # touches SRS state.
     if backfill:
         with get_conn() as conn:
             for r, card_id in backfill:
                 conn.execute(
-                    "UPDATE cards SET word_reading = ?, word_meaning = ?, highlight = ? WHERE id = ?",
-                    (r["word_reading"], r["word_meaning"], r["highlight"], card_id),
+                    "UPDATE cards SET word_reading = ?, word_meaning = ?, highlight = ?, image_path = ? WHERE id = ?",
+                    (r["word_reading"], r["word_meaning"], r["highlight"], r["image_path"], card_id),
                 )
 
     return await _do_import(new_rows, skipped)

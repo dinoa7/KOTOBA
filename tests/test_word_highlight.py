@@ -75,6 +75,49 @@ def test_same_sentence_different_headword_is_not_a_duplicate():
     assert resp2.json()["skipped_duplicates"] == 2
 
 
+def test_picture_field_is_extracted_and_served():
+    deck = build_apkg(
+        [
+            {
+                "word": "兄",
+                "word_reading": "あに",
+                "word_meaning": "older brother",
+                "sentence": "これは<b>兄</b>のパソコンです。",
+                "sentence_meaning": "This is my older brother's computer.",
+                "picture": '<img src="ani.jpg">',
+            }
+        ],
+        {"ani.jpg": b"FAKE_IMAGE_BYTES"},
+    )
+
+    resp = _upload(deck)
+    assert resp.json()["imported"] == 1
+
+    card = client.get("/cards").json()[0]
+    assert card["image_path"] is not None
+
+    img = client.get(f"/images/{card['image_path']}")
+    assert img.status_code == 200
+    assert img.content == b"FAKE_IMAGE_BYTES"
+
+
+def test_note_without_picture_has_no_image_path():
+    deck = build_apkg(
+        [
+            {
+                "word": "人",
+                "word_meaning": "person",
+                "sentence": "あの<b>人</b>はいい人です。",
+                "sentence_meaning": "That person is a good person.",
+            }
+        ]
+    )
+
+    _upload(deck)
+    card = client.get("/cards").json()[0]
+    assert card["image_path"] is None
+
+
 def test_reimport_backfills_word_fields_without_new_cards():
     # A card imported before word fields existed: headword present, the rest empty.
     with get_conn() as conn:

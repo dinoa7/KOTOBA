@@ -11,6 +11,7 @@ class CardIn(BaseModel):
     word_meaning: str = ""
     highlight: str | None = None
     audio_path: str | None = None
+    image_path: str | None = None
 
 
 class CardOut(CardIn):
@@ -32,6 +33,7 @@ class CardOut(CardIn):
             word_meaning=(row["word_meaning"] if "word_meaning" in row_keys else "") or "",
             highlight=row["highlight"] if "highlight" in row_keys else None,
             audio_path=row["audio_path"],
+            image_path=row["image_path"] if "image_path" in row_keys else None,
             created_at=row["created_at"],
             review_count=row["review_count"] if "review_count" in row_keys else 0,
         )
@@ -79,6 +81,16 @@ class Breakdown(BaseModel):
 class BreakdownRequest(BaseModel):
     japanese: str
     card_id: int | None = None
+
+
+class ExampleRequest(BaseModel):
+    word: str
+
+
+class ExampleSentence(BaseModel):
+    japanese: str
+    hiragana: str
+    english: str
 
 
 class DrillRequest(BaseModel):

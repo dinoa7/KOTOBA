@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS cards (
     word_meaning TEXT DEFAULT '',  -- the headword's own definition, from the note's Word Meaning field
     highlight TEXT,                -- sentence with the deck's <b></b> kept around the target-word occurrence
     audio_path TEXT,               -- filename under data/audio/, served at /audio/<audio_path>
+    image_path TEXT,               -- filename under data/images/, served at /images/<image_path>
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -44,6 +45,13 @@ CREATE TABLE IF NOT EXISTS breakdown_cache (
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS example_cache (
+    word TEXT PRIMARY KEY,          -- the dictionary-form word the example was generated for
+    example_json TEXT NOT NULL,
+    model TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS api_log (
     id INTEGER PRIMARY KEY,
     endpoint TEXT,
@@ -68,6 +76,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE cards ADD COLUMN word_meaning TEXT DEFAULT ''")
     if "highlight" not in existing_cards:
         conn.execute("ALTER TABLE cards ADD COLUMN highlight TEXT")
+    if "image_path" not in existing_cards:
+        conn.execute("ALTER TABLE cards ADD COLUMN image_path TEXT")
 
     existing_reviews = {row["name"] for row in conn.execute("PRAGMA table_info(reviews)")}
     if "total_reviews" not in existing_reviews:

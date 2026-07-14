@@ -22,8 +22,14 @@ grammar notes.
   Anki decks render: the card front shows the sentence with its target word
   colored (using the deck's own highlight markup), and the back reveals the
   word's own reading and definition first, then the sentence furigana and
-  translation. A "Breakdown" button on any card hits the (usually cached)
-  breakdown endpoint.
+  translation. The note's picture (when the deck includes one) appears above
+  the word definition. A "Breakdown" button on any card hits the (usually
+  cached) breakdown endpoint, and every token row in the breakdown has an
+  "Example" button that generates one fresh example sentence for that word —
+  the plain sentence (target word in red), its full-hiragana rendering
+  (target word in black), and an English translation. Examples are cached
+  per dictionary-form word so repeat requests are free, and toggle closed
+  with the same button once generated.
 - **Search** — semantic, not keyword: embed the query, rank locally by
   cosine similarity, rerank the top candidates. Works in Japanese or
   English, and understands typed romaji ("te" → て) without corrupting real
@@ -44,7 +50,7 @@ grammar notes.
 
 | Need | Model | Endpoint |
 |---|---|---|
-| Sentence breakdowns, drill generation | `command-a-03-2025` | `/breakdown`, `/drill` |
+| Sentence breakdowns, drill generation, per-token examples | `command-a-03-2025` | `/breakdown`, `/drill`, `/example` |
 | Semantic card search, confusion detection | `embed-v4.0` | embedded once at import |
 | "Which cards answer this question?" | `rerank-v4.0-pro` | `/search` |
 
@@ -86,7 +92,8 @@ Meaning` fields as the card's `japanese`/`english` (not the bare vocab word —
 see "Sentence-first, not word-first" below), keeps the vocab word separately
 as `headword` along with its `Word Reading`/`Word Meaning` fields and the
 deck's own bold markup marking the target word inside the sentence, and
-extracts the sentence's audio clip into `data/audio/` for in-app playback.
+extracts the sentence's audio clip into `data/audio/` and the note's
+Picture into `data/images/` for in-app playback and display.
 Duplicates are keyed on (sentence, meaning, headword) — sentence-per-word
 decks legitimately reuse one sentence for several target words. Re-importing
 a deck backfills word fields onto existing cards without new embed calls or

@@ -6,6 +6,7 @@ venv/
 data/kotoba.db
 data/vectors.npz
 data/audio/*
+data/images/*
 *.egg-info/
 .pytest_cache/
 .DS_Store

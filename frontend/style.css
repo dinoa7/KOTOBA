@@ -236,8 +236,10 @@ main {
    <b> markup, Anki-style). */
 .hl-word { color: var(--accent); }
 
-/* Anki-style word definition line revealed with the answer:
-   word → reading → meaning. */
+/* Word definition line revealed with the answer: hiragana reading (in the
+   accent color, tying it to the highlighted word in the sentence) + meaning.
+   Sized larger than the sentence translation (.english, 18px) — the target
+   word is the point of the card. */
 .word-def {
   display: flex;
   align-items: baseline;
@@ -246,9 +248,18 @@ main {
   flex-wrap: wrap;
   margin-top: 20px;
 }
-.word-def-word { color: var(--accent); font-weight: 700; font-size: 24px; }
-.word-def-reading { color: var(--muted-2); font-size: 15px; }
-.word-def-meaning { font-size: 16px; }
+.word-def-reading { color: var(--accent); font-weight: 700; font-size: 21px; }
+.word-def-meaning { font-size: 21px; font-weight: 700; }
+
+/* The note's Picture field, shown above the word definition on reveal. */
+.word-image {
+  display: block;
+  margin: 20px auto 0;
+  max-width: min(260px, 80%);
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: 12px;
+}
 
 .audio-row { margin-top: 18px; }
 
@@ -400,6 +411,32 @@ td { padding: 9px 10px; border-bottom: 1px solid var(--border-soft); }
 td:first-child { font-weight: 700; }
 td:nth-child(2) { color: var(--accent); }
 td:nth-child(4), td:nth-child(6) { color: var(--muted); }
+
+/* per-token example sentences */
+.example-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: border-color 150ms, color 150ms;
+}
+.example-btn:hover { border-color: var(--accent); color: var(--accent); }
+.example-btn:disabled { opacity: 0.6; cursor: wait; }
+.example-row td {
+  background: var(--panel-2);
+  text-align: left;
+  font-weight: 400;
+  padding: 12px 14px;
+}
+.example-row .ex-jp { color: var(--text); font-size: 16px; font-weight: 700; }
+.example-row .ex-hira { color: var(--accent); font-size: 14px; margin-top: 2px; }
+.example-row .ex-en { color: var(--muted); font-size: 14px; margin-top: 2px; }
+/* inverse of .hl-word, for the target word inside the red hiragana line */
+.ex-hl-dark { color: var(--text); font-weight: 700; }
 
 /* ---------- result cards (search / drill / confusions / recent) ---------- */
 /* Mirrors .card's centered, rounded look at a smaller scale — a narrower
