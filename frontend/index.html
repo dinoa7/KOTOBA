@@ -38,6 +38,7 @@
     </button>
     <input id="volume-slider" type="range" min="0" max="100" value="70" aria-label="Volume">
   </div>
+  <button id="night-toggle" class="night-toggle" type="button" title="Night mode">夜</button>
   <div id="offline-badge" class="badge hidden">AI offline</div>
 </header>
 
@@ -46,7 +47,10 @@
 
   <!-- REVIEW -->
   <section id="tab-review" class="tab-panel active">
-    <div id="review-empty" class="hidden">No cards due. Nice work.</div>
+    <div id="review-empty" class="empty-state hidden">
+      <div class="watermark">言葉</div>
+      <div class="empty-msg">No cards due. Nice work — come back later or import more.</div>
+    </div>
     <div id="review-session-bar" class="session-bar hidden">
       <span class="session-left">
         <span class="session-label">Session <span class="session-position">· card <span id="rv-position">1</span></span></span>
@@ -57,8 +61,11 @@
           <span id="rv-streak-count"></span>
         </span>
       </span>
-      <button id="rv-back-btn" class="pill-ghost hidden">‹ Back</button>
-      <span id="rv-review-count" class="review-count-pill"></span>
+      <span class="session-right">
+        <button id="rv-back-btn" class="pill-ghost hidden">‹ Back</button>
+        <button id="furigana-toggle" class="furigana-toggle" type="button" title="Show furigana">ふりがな</button>
+        <span id="rv-review-count" class="review-count-pill"></span>
+      </span>
     </div>
     <div id="review-card-wrap" class="hidden">
       <div id="review-card" class="card">
@@ -90,7 +97,7 @@
           <button class="grade-btn" data-q="4">Easy</button>
           <button class="grade-btn" data-q="5">Very Easy</button>
         </div>
-        <div class="kbd-hint">press <b>1–5</b> to grade</div>
+        <div class="kbd-hint">press <b>1–5</b> to grade · <b>backspace</b> to undo</div>
       </div>
     </div>
   </section>
@@ -102,7 +109,7 @@
       <button id="search-btn" class="pill-accent">Search</button>
     </div>
     <div class="tab-subtext">Semantic search across your deck — meaning, grammar, or romaji.</div>
-    <div id="search-results" class="results-list"></div>
+    <div id="search-results" class="results-list"><div class="empty-state"><div class="watermark">言葉</div></div></div>
   </section>
 
   <!-- DRILL -->
@@ -112,7 +119,7 @@
       <button id="drill-btn" class="pill-accent">Generate Drill</button>
     </div>
     <div class="tab-subtext">Fresh practice sentences built only from vocabulary you already know.</div>
-    <div id="drill-results" class="results-list"></div>
+    <div id="drill-results" class="results-list"><div class="empty-state"><div class="watermark">言葉</div></div></div>
   </section>
 
   <!-- CONFUSIONS -->
@@ -121,7 +128,7 @@
       <button id="confusions-btn" class="pill-accent">Find Confusions</button>
       <div class="tab-subtext">Pairs of cards you keep mixing up — similar meaning, both lapsing.</div>
     </div>
-    <div id="confusions-results" class="results-list"></div>
+    <div id="confusions-results" class="results-list"><div class="empty-state"><div class="watermark">言葉</div></div></div>
   </section>
 
   <!-- RECENT -->
@@ -169,6 +176,8 @@
 
   </div>
 </main>
+
+<div id="toast-stack"></div>
 
 <footer>
   <span id="stats-line"></span>

@@ -1,5 +1,41 @@
 const API = "";
 
+// ---------- night mode ----------
+const NIGHT_KEY = "kotoba-night";
+let nightOn = localStorage.getItem(NIGHT_KEY) === "1";
+
+function applyNight() {
+  document.documentElement.dataset.night = nightOn ? "1" : "0";
+  document.getElementById("night-toggle").textContent = nightOn ? "昼" : "夜";
+}
+
+document.getElementById("night-toggle").addEventListener("click", () => {
+  nightOn = !nightOn;
+  localStorage.setItem(NIGHT_KEY, nightOn ? "1" : "0");
+  applyNight();
+});
+
+applyNight();
+
+// ---------- condensing header ----------
+window.addEventListener(
+  "scroll",
+  () => {
+    document.querySelector("header").classList.toggle("condensed", window.scrollY > 40);
+  },
+  { passive: true }
+);
+
+// ---------- toasts ----------
+function toast(msg) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = `<div class="toast-hanko">言</div><div></div>`;
+  el.lastElementChild.textContent = msg;
+  document.getElementById("toast-stack").appendChild(el);
+  setTimeout(() => el.remove(), 3400);
+}
+
 // ---------- sound effects ----------
 const VOLUME_KEY = "kotoba-volume";
 const storedVolume = parseInt(localStorage.getItem(VOLUME_KEY), 10);
@@ -103,6 +139,49 @@ function playBell(quality) {
   });
 }
 
+// A plucked pentatonic note — the streak's reward sound. Each consecutive
+// Easy grade climbs the scale; milestones get a two-note flourish.
+function kotoNote(freq, when, amp) {
+  const ctx = ac();
+  if (!ctx) return;
+  const t = ctx.currentTime + when;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(amp, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+  const filt = ctx.createBiquadFilter();
+  filt.type = "lowpass";
+  filt.frequency.setValueAtTime(freq * 4, t);
+  filt.frequency.exponentialRampToValueAtTime(freq * 1.5, t + 0.3);
+  filt.connect(g);
+  g.connect(_masterGain);
+  [[1, 1, "triangle"], [2, 0.35, "sine"], [1.003, 0.5, "triangle"]].forEach(([m, a, type]) => {
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.value = freq * m;
+    const og = ctx.createGain();
+    og.gain.value = a;
+    o.connect(og);
+    og.connect(filt);
+    o.start(t);
+    o.stop(t + 0.5);
+  });
+}
+
+function playKoto(step) {
+  if (!ac()) return;
+  const penta = [523.25, 587.33, 698.46, 783.99, 880.0];
+  const idx = Math.min(step - 1, 14);
+  const freq = penta[idx % 5] * Math.pow(2, Math.floor(idx / 5));
+  kotoNote(freq, 0.09, 0.07);
+}
+
+function playFlourish() {
+  if (!ac()) return;
+  kotoNote(783.99, 0.1, 0.08);
+  kotoNote(1174.66, 0.24, 0.08);
+}
+
 // ---------- tabs ----------
 let panelAnimFlip = false;
 
@@ -181,6 +260,16 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// The stored reading is Anki furigana notation — kanji followed by its reading
+// in brackets, e.g. "これは兄[あに]のパソコンです。". Collapse each 漢字[かな]
+// group down to just the かな (and drop Anki's ruby delimiter spaces) so the
+// pill shows a pure-kana pronunciation with no kanji.
+function toPureKana(reading) {
+  return String(reading)
+    .replace(/\s*[一-鿿々〆ヶ]+\[([^\]]*)\]/g, "$1")
+    .replace(/[ 　]+/g, "");
+}
+
 // Render a card's sentence with the target word colored. Prefers the deck's
 // own <b></b> markup (preserved at import as `highlight`) — it marks WHICH
 // occurrence is the target, which substring matching can't (人 appears twice
@@ -224,7 +313,9 @@ function renderBreakdownButton(japanese) {
 
 // Same reading-pill + translation + breakdown reveal, gated behind a Show
 // Answer button, used everywhere a card's Japanese is shown up front —
-// mirrors the Review tab's reveal flow instead of exposing the answer immediately.
+// mirrors the Review tab's reveal flow instead of exposing the answer
+// immediately. Per the v2 design, closing is a small ghost "Minimize" at the
+// bottom of the opened reveal rather than the accent button toggling.
 function renderRevealBlock(card) {
   const wordDef = renderWordDef(card);
   const image = card.image_path
@@ -234,19 +325,49 @@ function renderRevealBlock(card) {
     <div class="result-reveal hidden">
       ${image}
       ${wordDef ? `<div class="word-def">${wordDef}</div>` : ""}
-      ${card.reading ? `<div class="reading-pill">${card.reading}</div>` : ""}
+      ${card.reading ? `<div class="reading-pill">${escapeHtml(toPureKana(card.reading))}</div>` : ""}
       <div class="english">${card.english}</div>
       ${renderBreakdownButton(card.japanese)}
+      <div><button class="minimize-btn">Minimize</button></div>
     </div>`;
 }
 
 document.addEventListener("click", (e) => {
-  if (!e.target.classList.contains("show-answer-btn")) return;
-  const reveal = e.target.nextElementSibling;
-  const nowHidden = reveal.classList.toggle("hidden");
-  if (!nowHidden) playSwoosh();
-  e.target.textContent = nowHidden ? "Show Answer" : "Minimize";
+  if (e.target.classList.contains("show-answer-btn")) {
+    playSwoosh();
+    e.target.nextElementSibling.classList.remove("hidden");
+    e.target.classList.add("hidden");
+  } else if (e.target.classList.contains("minimize-btn")) {
+    const reveal = e.target.closest(".result-reveal");
+    if (!reveal) return;
+    reveal.classList.add("hidden");
+    reveal.previousElementSibling.classList.remove("hidden");
+  }
 });
+
+// Loading placeholders (v2): shimmering skeletons instead of text.
+function skeletonCards(n) {
+  return Array.from({ length: n })
+    .map(
+      () => `<div class="result-item skel-card">
+        <div class="skel-line" style="height:20px;width:55%"></div>
+        <div class="skel-line" style="width:35%"></div>
+      </div>`
+    )
+    .join("");
+}
+
+function breakdownSkeleton() {
+  return `<div class="breakdown-skel">
+    <div class="skel-line"></div>
+    <div class="skel-line" style="width:80%;margin:0 auto"></div>
+    <div class="skel-line" style="width:60%;margin:0 auto"></div>
+  </div>`;
+}
+
+function emptyWatermark(msg) {
+  return `<div class="empty-state"><div class="watermark">言葉</div>${msg ? `<div class="empty-msg">${msg}</div>` : ""}</div>`;
+}
 
 document.addEventListener("click", async (e) => {
   if (!e.target.classList.contains("breakdown-btn")) return;
@@ -254,7 +375,7 @@ document.addEventListener("click", async (e) => {
   const japanese = btn.dataset.japanese;
   const slot = document.getElementById(btn.dataset.target);
   btn.classList.add("hidden");
-  slot.textContent = "Loading...";
+  slot.innerHTML = breakdownSkeleton();
   try {
     const data = await apiFetch(`${API}/breakdown`, {
       method: "POST",
@@ -362,6 +483,28 @@ let grading = false;
 let lastGraded = null;
 let gradeHistory = []; // session-local qualities, newest last — feeds the streak flame
 
+// ---------- furigana toggle ----------
+// The reading shows in exactly one place — the red pill inside the reveal —
+// after Show Answer. The ふりがな button is always available in the session
+// bar; toggling it sets whether the pill appears on reveal. On by default.
+const FURIGANA_KEY = "kotoba-furigana";
+let furiganaOn = localStorage.getItem(FURIGANA_KEY) !== "0";
+
+function applyFurigana() {
+  const btn = document.getElementById("furigana-toggle");
+  btn.classList.toggle("active", furiganaOn);
+  btn.title = furiganaOn ? "Hide furigana" : "Show furigana";
+  const revealed = !document.getElementById("rv-reveal").classList.contains("hidden");
+  const reading = currentCard ? currentCard.reading || "" : "";
+  document.getElementById("rv-reading").classList.toggle("hidden", !(furiganaOn && revealed && reading));
+}
+
+document.getElementById("furigana-toggle").addEventListener("click", () => {
+  furiganaOn = !furiganaOn;
+  localStorage.setItem(FURIGANA_KEY, furiganaOn ? "1" : "0");
+  applyFurigana();
+});
+
 // How many other cards get shown before a just-graded card resurfaces this
 // session. This is separate from — and in addition to — the long-term SM-2
 // due_date the same grade also sets on the backend for future days.
@@ -449,6 +592,7 @@ function showCard() {
   cardWrap.classList.remove("hidden");
   sessionBar.classList.remove("hidden");
   populateCardDOM(currentCard);
+  applyFurigana();
 }
 
 function populateCardDOM(card) {
@@ -479,7 +623,7 @@ function populateCardDOM(card) {
     playBtn.classList.add("hidden");
   }
 
-  document.getElementById("rv-reading").textContent = card.reading || "";
+  document.getElementById("rv-reading").textContent = toPureKana(card.reading || "");
   document.getElementById("rv-english").textContent = card.english;
   const count = card.review_count || 0;
   document.getElementById("rv-review-count").textContent =
@@ -496,6 +640,7 @@ function revealCard() {
   document.getElementById("rv-reveal").classList.remove("hidden");
   document.getElementById("rv-grades").classList.remove("hidden");
   document.getElementById("rv-show-wrap").classList.add("hidden");
+  applyFurigana();
 }
 
 document.getElementById("rv-show").addEventListener("click", revealCard);
@@ -503,7 +648,7 @@ document.getElementById("rv-show").addEventListener("click", revealCard);
 document.getElementById("rv-breakdown-btn").addEventListener("click", async (e) => {
   e.target.classList.add("hidden");
   const el = document.getElementById("rv-breakdown-table");
-  el.textContent = "Loading...";
+  el.innerHTML = breakdownSkeleton();
   try {
     const data = await apiFetch(`${API}/breakdown`, {
       method: "POST",
@@ -538,7 +683,20 @@ async function gradeCard(quality) {
   dueQueue.splice(insertAt, 0, gradedCard);
   sessionPosition += 1;
   gradeHistory.push(quality);
-  updateStreak(quality >= 4);
+  const grew = quality >= 4;
+  updateStreak(grew);
+  if (grew) {
+    const n = currentStreak();
+    playKoto(n);
+    if ([5, 10, 25, 50].includes(n)) {
+      playFlourish();
+      toast(`${n} in a row! ${n}連続`);
+      const streakEl = document.getElementById("rv-streak");
+      streakEl.classList.remove("streak-milestone");
+      void streakEl.offsetWidth;
+      streakEl.classList.add("streak-milestone");
+    }
+  }
   document.getElementById("rv-back-btn").classList.remove("hidden");
 
   setTimeout(() => {
@@ -584,6 +742,7 @@ async function goBack() {
   document.getElementById("rv-reveal").classList.remove("hidden");
   document.getElementById("rv-grades").classList.remove("hidden");
   document.getElementById("rv-show-wrap").classList.add("hidden");
+  applyFurigana();
 
   lastGraded = null;
   document.getElementById("rv-back-btn").classList.add("hidden");
@@ -613,7 +772,7 @@ document.getElementById("search-btn").addEventListener("click", async () => {
   const q = document.getElementById("search-input").value.trim();
   if (!q) return;
   const resultsEl = document.getElementById("search-results");
-  resultsEl.textContent = "Searching...";
+  resultsEl.innerHTML = skeletonCards(3);
   try {
     const results = await apiFetch(`${API}/search?q=${encodeURIComponent(q)}`);
     resultsEl.innerHTML = results
@@ -625,7 +784,7 @@ document.getElementById("search-btn").addEventListener("click", async () => {
           ${renderRevealBlock(r.card)}
         </div>`
       )
-      .join("") || "<p>No results.</p>";
+      .join("") || emptyWatermark("No results.");
   } catch (err) {
     resultsEl.textContent = "AI unavailable — search requires the Cohere API.";
   }
@@ -635,7 +794,7 @@ document.getElementById("search-btn").addEventListener("click", async () => {
 document.getElementById("drill-btn").addEventListener("click", async () => {
   const grammarPoint = document.getElementById("drill-grammar").value.trim();
   const resultsEl = document.getElementById("drill-results");
-  resultsEl.textContent = "Generating...";
+  resultsEl.innerHTML = skeletonCards(3);
   try {
     const data = await apiFetch(`${API}/drill`, {
       method: "POST",
@@ -659,7 +818,7 @@ document.getElementById("drill-btn").addEventListener("click", async () => {
           </div>
         </div>`
       )
-      .join("") || "<p>No drill sentences generated — try a different grammar point.</p>";
+      .join("") || emptyWatermark("No drill sentences generated — try a different grammar point.");
   } catch (err) {
     resultsEl.textContent = err.message || "AI unavailable — drill generation requires the Cohere API.";
   }
@@ -670,13 +829,15 @@ document.getElementById("drill-results").addEventListener("click", (e) => {
   const body = e.target.closest(".drill-item").querySelector(".drill-body");
   const nowHidden = body.classList.toggle("hidden");
   if (!nowHidden) playSwoosh();
+  // v2: accent "Show Answer" when closed, ghost "Minimize" when open
+  e.target.className = nowHidden ? "drill-toggle-btn pill-accent" : "drill-toggle-btn minimize-btn";
   e.target.textContent = nowHidden ? "Show Answer" : "Minimize";
 });
 
 // ---------- confusions ----------
 document.getElementById("confusions-btn").addEventListener("click", async () => {
   const resultsEl = document.getElementById("confusions-results");
-  resultsEl.textContent = "Analyzing...";
+  resultsEl.innerHTML = skeletonCards(3);
   const pairs = await apiFetch(`${API}/confusions`);
   resultsEl.innerHTML = pairs
     .map(
@@ -689,7 +850,7 @@ document.getElementById("confusions-btn").addEventListener("click", async () => 
         ${renderRevealBlock(p.card_b)}
       </div>`
     )
-    .join("") || "<p>No confusions detected yet.</p>";
+    .join("") || emptyWatermark("No confusions detected yet.");
 });
 
 // ---------- recent ----------
@@ -709,7 +870,7 @@ function relativeTime(isoString) {
 
 async function loadRecent() {
   const resultsEl = document.getElementById("recent-results");
-  resultsEl.textContent = "Loading...";
+  resultsEl.innerHTML = skeletonCards(3);
   const entries = await apiFetch(`${API}/review/recent?limit=20`);
   resultsEl.innerHTML = entries
     .map(
@@ -720,7 +881,7 @@ async function loadRecent() {
         ${renderRevealBlock(entry.card)}
       </div>`
     )
-    .join("") || "<p>No cards reviewed yet.</p>";
+    .join("") || emptyWatermark("No cards reviewed yet.");
 }
 
 // ---------- kana chart ----------
@@ -788,6 +949,7 @@ document.getElementById("import-btn").addEventListener("click", async () => {
   try {
     const data = await apiFetch(`${API}/cards/import`, { method: "POST", body: formData });
     resultEl.textContent = `Imported ${data.imported}, skipped ${data.skipped_duplicates} duplicates (${data.embed_calls} embed calls).`;
+    toast(`Imported ${data.imported} cards, skipped ${data.skipped_duplicates} duplicates.`);
     refreshStats();
     loadDue();
   } catch (err) {
@@ -811,6 +973,7 @@ document.getElementById("add-btn").addEventListener("click", async () => {
     }),
   });
   resultEl.textContent = `Added 「${japanese}」`;
+  toast(`Added 「${japanese}」`);
   ["add-japanese", "add-reading", "add-english", "add-tags"].forEach(
     (id) => (document.getElementById(id).value = "")
   );

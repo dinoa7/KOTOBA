@@ -49,6 +49,15 @@ grammar notes.
 - **Chart** — a hiragana/katakana gojūon reference chart (46 basic
   characters each) with a pill slider to flip between the two scripts.
   Fully static, zero API calls.
+- **Night mode** — a 夜/昼 toggle in the header swaps the whole warm hanko
+  palette for a lamplight-dark equivalent (persisted across sessions), with
+  the same accent red and fixed grade colors in both themes.
+- **Polish** — sticky header that condenses on scroll, a ふりがな toggle on
+  Review (inline furigana above the sentence instead of the reading pill),
+  shimmer skeletons while AI calls run, toast notifications (imports, added
+  cards, streak milestones), pentatonic koto notes that climb with the easy
+  streak, and 言葉 watermark empty states — all from the KOTOBA Hanko v2
+  design.
 - **Import** — raw Anki `.apkg`, sentence + audio extracted directly.
 
 ## Why Cohere
