@@ -1,6 +1,7 @@
 # KOTOBA (言葉)
 
-**[FULLY EXPLAINED IN 100 SECONDS ->](https://youtu.be/ZRJGNJdPFmU)**
+**[FULLY EXPLAINED IN 100 SECONDS](https://youtu.be/ZRJGNJdPFmU)**
+https://youtu.be/ZRJGNJdPFmU
 
 A personal Japanese flashcard trainer that uses Cohere's Embed, Rerank, and
 Command models to turn a flat deck of cards into a semantic, adaptive study
