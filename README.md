@@ -1,5 +1,7 @@
 # KOTOBA (言葉)
 
+**[FULLY EXPLAINED IN 100 SECONDS ->](https://youtu.be/ZRJGNJdPFmU)**
+
 A personal Japanese flashcard trainer that uses Cohere's Embed, Rerank, and
 Command models to turn a flat deck of cards into a semantic, adaptive study
 tool.
@@ -39,9 +41,10 @@ grammar notes.
 - **Drill** — generates fresh practice sentences constrained to vocabulary
   you've already reviewed at least twice, targeting a grammar point you
   choose — no word outside your own known-vocab list is ever used.
-- **Confusions** — pure local math, zero API calls: pairwise cosine
-  similarity across every card, cross-referenced with lapse counts, surfaces
-  pairs you keep mixing up so they can be drilled side by side.
+- **Confusions** (`GET /confusions`) — pure local math, zero API calls:
+  pairwise cosine similarity across every card, cross-referenced with lapse
+  counts, surfaces pairs you keep mixing up so they can be drilled side by
+  side.
 - **Recent** — a chronological log of every card you've graded, most recent
   first. Paired with a one-step "Back" button on the Review tab that undoes
   the last grade — restoring the prior SM-2 state on the server, not just
@@ -88,7 +91,7 @@ Browser (vanilla JS)  →  FastAPI (Python 3.11+)  →  SQLite + numpy .npz vect
 ## Setup
 
 ```bash
-py -m venv .venv
+py -m venv .venv               # Windows; use `python3 -m venv .venv` on macOS/Linux
 ./.venv/Scripts/activate       # Windows; use `source .venv/bin/activate` on macOS/Linux
 pip install -r requirements.txt
 cp .env.example .env           # then paste in your Cohere trial API key
@@ -197,6 +200,3 @@ breakdowns/day, ~3 drills/day, ~2 searches/day) lands around 366 calls/month.
   column; plain-text `japanese` stays the source for embeddings, prompts,
   and dedup ([app/anki_import.py](app/anki_import.py)). Headword substring
   matching survives only as a display fallback for cards without markup.
-
-## Video demo
-https://youtu.be/C85SlkMwqmY

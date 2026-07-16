@@ -21,3 +21,9 @@ cards/*.apkg
 KOTOBA Hanko.html
 KOTOBA Current.html
 KOTOBA Redesign Options.html
+
+# private in-depth engineering companion to the README — not for the repo
+FULL EXPLANATION.md
+
+# personal recording script — not for the repo
+DEMO SCRIPT.md

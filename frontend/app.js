@@ -326,7 +326,7 @@ function renderRevealBlock(card) {
       ${image}
       ${wordDef ? `<div class="word-def">${wordDef}</div>` : ""}
       ${card.reading ? `<div class="reading-pill">${escapeHtml(toPureKana(card.reading))}</div>` : ""}
-      <div class="english">${card.english}</div>
+      <div class="english">${escapeHtml(card.english)}</div>
       ${renderBreakdownButton(card.japanese)}
       <div><button class="minimize-btn">Minimize</button></div>
     </div>`;
